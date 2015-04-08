@@ -100,10 +100,11 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 					maxItemsAtOneTimestamp = itemsAtCurrentTimestamp;
 				}
 				itemCounts.adjustOrPutValue(item, +1, +1);
+				previousTimestamp = timestamp;
 			}
 			
 			// add dummy item "#" as max items value
-			itemCounts.put("#", maxItemsAtOneTimestamp)
+			itemCounts.put("#", maxItemsAtOneTimestamp);
 
 			// emit item and frequency
 			for (String term : itemCounts.keys()) {
@@ -127,6 +128,9 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 		// document frequencies
 		private final OpenObjectIntHashMap<String> dfs = new OpenObjectIntHashMap<String>();
+		
+		// special key
+		private final Text specialKey = new Text("#");
 
 		@Override
 		protected void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException,
@@ -134,8 +138,10 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			int cf = 0;
 			int df = 0;
 			
+		   
+			
 			// all "normal" keys
-			if(!"#".equals(key)) {
+			if(!key.equals(specialKey)) {
 				for (IntWritable value : values) {
 					cf += value.get();
 					df++;
@@ -190,7 +196,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			
 			// re-add dummy value
 			outKey.set("#");
-			outValue.set(maxItemsAtOneTimestamp  + "\t0\t0");
+			outValue.set("0\t0\t" + maxItemsAtOneTimestamp);
 			context.write(outKey, outValue);
 		}
 	}
@@ -210,56 +216,139 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 		// mapping from terms to their corresponding term identifiers
 		private final OpenObjectIntHashMap<String> itemTIdMap = new OpenObjectIntHashMap<String>();
+		
+		// the maximum number of items per at one timestamp (identified in the first MapReduce job)
+		private int maxItemsAtOneTimestamp; 
+		private int multiplyFactor;
+		
 
 		String itemSeparator = "\t";
 
 		@Override
 		protected void setup(Context context) throws IOException, InterruptedException {
-
+			
 			itemSeparator = context.getConfiguration().get("de.mpii.tools.itemSeparator", "\t");
 
 			try {
 				BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream("dictionary")));
+				System.err.println("DICTIONARY");
 				while (br.ready()) {
 					String[] tokens = br.readLine().split("\t");
 					itemTIdMap.put(tokens[0], Integer.parseInt(tokens[3]));
+					System.err.println(tokens[0] + "\t\t" + tokens[3]);
+					
 				}
 				br.close();
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
+			
+			// retrieve the maxFrequency from the Dictionary
+			maxItemsAtOneTimestamp = itemTIdMap.get("#");
+			multiplyFactor = (2 * maxItemsAtOneTimestamp) - 1;
+			
+
+			// DEBUG
+			System.err.println("Maximum items per timestamp: " + maxItemsAtOneTimestamp + ", multiplyFactor: " + multiplyFactor);
 		}
 
 		@Override
 		protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
 
-			String[] items = value.toString().split(itemSeparator);
+			String[] tokens = value.toString().split(itemSeparator);
 
 			IntArrayList itemIds = new IntArrayList();
 
-			String sequenceId = items[0];
+			String sequenceId = tokens[0];
+
 
 			long id = 0;
-
 			try {
 				id = Long.parseLong(sequenceId);
 			} catch (NumberFormatException e) {
 				// if this is not a number, hash it
 				id = sequenceId.hashCode();
 			}
+			
+			StringBuilder sb = new StringBuilder();
+			sb.append(sequenceId + " ");
+			
+			long currTime = 0;
+			long prevTime = 0;
+			long timeDelta = 0;
+			long timeGap = 0;
+			//long item = 0;
+			
+			int repeats = 0;
 
-			// ignore pos 0 which contains a sequence identifier
-			for (int i = 1; i < items.length; i++) {
-				// System.out.println(itemTIdMap.get(items[i]));
-				itemIds.add(itemTIdMap.get(items[i]));
+			
+			for (int i = 1; i < tokens.length; i=i+2) {
+
+		      // multiply each time-stamp by m=2f-1, where f is the maximum allowed frequency
+		      // f identical repeated time-stamps [t,t,...,t] will be replaced by [m*t, m*(t+1), m*(t+2), ... m*(t+f-1)]
+		      currTime = Long.parseLong(tokens[i]) * multiplyFactor;
+
+		      if (i != 1) {
+
+		        //item = Long.parseLong(tokens[i + 1]);
+		        timeDelta = currTime - prevTime;
+		        
+		        
+		        if (timeDelta < 0) {
+		          System.err.println("Wrongly formatted input! TimeDelta is " + timeDelta + " (" + currTime + " - " + prevTime + ")");
+		          // ToDo - error handling in Hadoop
+		          //return null;
+		        }
+
+		        if (timeDelta == 0) {
+
+		          // replace consecutive identical time-stamps
+		          repeats++;
+		          //sb.append(item + (i != tokens.length - 1 ? " " : ""));
+		          itemIds.add(itemTIdMap.get(tokens[i+1]));
+
+		        } else {
+
+		          // new increasing time-stamp, reset repeat counter
+		          timeGap = timeDelta - repeats - 1;
+		          repeats = 0;
+		          if (timeGap > 0) {
+		            //sb.append(-timeGap + " " + item + (i != tokens.length - 1 ? " " : ""));
+		        	// ToDo: clear whether we want to convert itemIds to long
+		        	itemIds.add((int) -timeGap);
+		        	itemIds.add(itemTIdMap.get(tokens[i+1]));
+		          } else {
+		        	itemIds.add(itemTIdMap.get(tokens[i+1]));
+		          }
+
+		        }
+
+		        prevTime = currTime;
+
+		      } else {
+
+		        // first item, no time delta appended
+		        prevTime = currTime;
+		        //item = Long.parseLong(tokens[i + 1]);
+		        //sb.append(item + (i != tokens.length - 1 ? " " : ""));
+		        itemIds.add(itemTIdMap.get(tokens[i+1]));
+		      }
+
+		    }
+			
+			//DEBUG 
+			StringBuilder sb2 = new StringBuilder();
+			sb2.append(id + ": ");
+			for(int item: itemIds.toArray(new int[0])) {
+				sb2.append(item + " ");
 			}
-
+			System.err.println(sb2);
+			
 			if (itemIds.size() > 0) {
 
 				outKey.set(id);
 				outValue.setContents(itemIds.toArray(new int[0]));
-				// System.out.println(itemIds.toString());
-
+				
 				context.write(outKey, outValue);
 			}
 
