@@ -80,7 +80,10 @@ import de.mpii.fsm.util.Dictionary;
  *                              used for the map--reduce jobs.
  *                              
  * 	11. --numReducers (-N)  (Optional) Number of reducers to be used by MG-FSM.
- * 							Default value : 90                              
+ * 							Default value : 90      
+ * 
+ *  12. --timestampInput (-ti) (Optional) Specify whether you would like to use a timestamp-encoded input format like:
+ *  							seqId timestamp1 item1 timestamp2 item2 timestampN itemN
  *  
  *-------------------------------------------------------------------------------------  
  *  References :
@@ -182,6 +185,10 @@ public final class FsmDriver extends AbstractJob {
         + "runs of the MG-FSM algorithm on"
         + " already encoded transaction file located in the folder specified in input.\n",
           null);
+    
+    /* timestampInput for reading timestamp-encoded input files */
+    addOption("timestampInput", "ti", "(Optional) Specify whether you would like to use a timestamp-encoded input format like:"
+    			+ "\nseqId timestamp1 item1 timestamp2 item2 timestampN itemN");
 
     /*Developer-interesting options*/
     addOption("partitionSize", "p",
@@ -295,6 +302,12 @@ public final class FsmDriver extends AbstractJob {
     } 
     else {
       params.set("keepFiles", null);
+    }
+    if (hasOption("timestampInput")) {
+      params.set("timestampInput", "true");
+    } 
+    else {
+      params.set("timestampInput", "false");
     }
     if (hasOption("resume")) {
       String resumeString = getOption("resume");
@@ -469,6 +482,7 @@ public final class FsmDriver extends AbstractJob {
 
     commonConfig.setPartitionSize(Long.parseLong(params.get("partitionSize")));
     commonConfig.setAllowSplits(Boolean.parseBoolean(params.get("splits")));
+    commonConfig.setTimestampInputOption(Boolean.parseBoolean(params.get("timestampInput")));
     
     if(params.get("numReducers") != null){
     	commonConfig.setNumberOfReducers(Integer.parseInt(params.get("numReducers")));

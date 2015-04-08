@@ -147,6 +147,7 @@ public class FsmConfig {
   private String   intermediatePath;
   private boolean  resumeOption;
   private boolean  keepFilesOption;
+  private boolean  timestampInputOption;
 
 
   //other user-interesting parameters
@@ -216,6 +217,7 @@ public class FsmConfig {
     //other book-keeping parameters
     this.resumeOption     = false;
     this.keepFilesOption  = true;
+    this.timestampInputOption = false;
     this.allowSplits      = false;
     this.debugLevel       = DEFAULT_DEBUG_LEVEL;
     this.indexingMethod   = IndexingMethod.FULL;
@@ -255,6 +257,7 @@ public class FsmConfig {
     //other book-keeping parameters
     this.resumeOption     = commonConfig.isResumeOption();
     this.keepFilesOption  = commonConfig.isKeepFilesOption();
+    this.timestampInputOption = commonConfig.isTimestampInputOption();
     this.allowSplits      = commonConfig.isAllowSplits();
     this.debugLevel       = commonConfig.getDebugLevel();
     this.indexingMethod   = commonConfig.getIndexingMethod();
@@ -386,6 +389,22 @@ public class FsmConfig {
    */
   public void setKeepFilesOption(boolean keepFilesOption) {
     this.keepFilesOption = keepFilesOption;
+  }
+  
+  /**
+   * 
+   * @return boolean
+   */
+  public boolean isTimestampInputOption() {
+    return timestampInputOption;
+  }
+
+  /**
+   * 
+   * @param boolean timestampInputOption
+   */
+  public void setTimestampInputOption(boolean timestampInputOption) {
+    this.timestampInputOption = timestampInputOption;
   }
 
   /**

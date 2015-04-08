@@ -12,6 +12,7 @@ import de.mpii.fsm.mgfsm.FsmJob;
 import de.mpii.fsm.mgfsm.maximal.MaxFsmJob;
 import de.mpii.fsm.output.SequenceTranslator;
 import de.mpii.fsm.tools.ConvertSequences;
+import de.mpii.fsm.tools.ConvertTimestampSequences;
 import de.mpii.fsm.util.Constants;
 
 
@@ -136,7 +137,16 @@ public class DistributedMode
       prepJobs();
       /* Run Step 1, Step 2, & Step 3. */
       /* Step 1. Construct dictionary and encode input sequences. */
-      ToolRunner.run(new ConvertSequences(), toolRunnerArgs);
+      
+      /* Option 1a) Read usual input format */
+      if(!this.commonConfig.isTimestampInputOption()) {
+    	  System.out.println("Using standard input format.");
+          ToolRunner.run(new ConvertSequences(), toolRunnerArgs);
+      }
+      else {
+    	  System.out.println("Using timestamp-encoded input format.");
+          ToolRunner.run(new ConvertTimestampSequences(), toolRunnerArgs);
+      }
      
       /* Step 2. Mine the frequent sequences. */
       FsmJob.runFsmJob();
