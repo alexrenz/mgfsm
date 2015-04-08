@@ -125,6 +125,7 @@ Sample output:
 | indexing      	| id         	| Yes      	| full          	| Specify the indexing mode. Options are : 1. none 2. minmax 3. full                                                                                                                                           	|
 | split         	| sp         	| Yes      	| false         	| Explicitly specify whether or not to allow split by setting this flag.                                                                                                                                       	|
 | timestampInput   	| ti         	| Yes      	| false         	| Specify whether to use the timestamp-encoded input format                                                                                                                                     	|
+| temporalGap   	| tg         	| Yes      	| 0         		| Set a temporal gap for the timestamp-encoded input. Required when using -timestampInput.                                                                                                                                 	|
 
 **Additional Notes**
 
@@ -132,6 +133,7 @@ Sample output:
 +   -(i)nput is optional as -(r)esume can also be used for pointing to the input source.
 +   -(i)nput and -(r)esume are mutually exclusive.
 +   -(o)utput is the only mandatory option. It points to the location where the translated frequent sequences will be written.
++   -temporalGap (-tg) is mandatory when using -timestampInput. -(g)amma values will be ignored when using -timestampInput
 
 **Timestamp-encoded input format**
 

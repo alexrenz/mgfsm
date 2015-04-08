@@ -85,6 +85,8 @@ import de.mpii.fsm.util.Dictionary;
  *  12. --timestampInput (-ti) (Optional) Specify whether you would like to use a timestamp-encoded input format like:
  *  							seqId timestamp1 item1 timestamp2 item2 timestampN itemN
  *  
+ *  13. --temporalGap (-tg) (Optional, required when using -ti) Specify a temporal maximum gap for timestampInput
+ *  
  *-------------------------------------------------------------------------------------  
  *  References :
  *-------------------------------------------------------------------------------------
@@ -189,6 +191,11 @@ public final class FsmDriver extends AbstractJob {
     /* timestampInput for reading timestamp-encoded input files */
     addOption("timestampInput", "ti", "(Optional) Specify whether to use the timestamp-encoded input format like this:"
     			+ "\nseqId timestamp1 item1 timestamp2 item2 timestampN itemN");
+    
+    addOption("temporalGap", 
+              "tg", 
+              "(Optional, required when using -ti) Specify a temporal maximum gap for timestampInput. \n"
+              + "The gap will be converted to a gamma value internally");
 
     /*Developer-interesting options*/
     addOption("partitionSize", "p",
@@ -309,6 +316,17 @@ public final class FsmDriver extends AbstractJob {
     else {
       params.set("timestampInput", "false");
     }
+    if (hasOption("temporalGap")) {
+	    String temporalGapString = getOption("temporalGap");
+	
+	    if(Integer.parseInt(temporalGapString) < 0)
+	    {
+	      System.out.println("Value of temporal gap should be greater than or equal to 0");
+	      //Return a non-zero exit status to indicate failure
+	      return (1);
+	    }
+	    params.set("temporalGap", temporalGapString);
+	  }
     if (hasOption("resume")) {
       String resumeString = getOption("resume");
       params.set("resume", resumeString);
@@ -365,6 +383,18 @@ public final class FsmDriver extends AbstractJob {
              inputDir = new Path(params.get("resume")); 
            }
      }
+     if((params.get("timestampInput")!=null) && (params.get("temporalGap")==null)){
+         System.out.println("No temporalGap (-tg) specified despite using timestampInput (-ti). Please specify a temporal gap.");
+         System.out.println("Exiting...");
+         //Return a non-zero exit status to indicate failure
+         return (1);
+     }
+     if((params.get("timestampInput")!=null) && (params.get("gamma")!=null)){
+         System.out.println("Gamma (-g) value specified although using timestampInput (-ti). Please do not pass a gamma value when using timestampInput as it will be ignored.");
+         System.out.println("Exiting...");
+         //Return a non-zero exit status to indicate failure
+         return (1);
+      }
     /* ---------------------------------------------------------------------
      * Checks to make sure the i/o paths
      * exist and are consistent.
@@ -483,6 +513,7 @@ public final class FsmDriver extends AbstractJob {
     commonConfig.setPartitionSize(Long.parseLong(params.get("partitionSize")));
     commonConfig.setAllowSplits(Boolean.parseBoolean(params.get("splits")));
     commonConfig.setTimestampInputOption(Boolean.parseBoolean(params.get("timestampInput")));
+    commonConfig.setTemporalGap(Integer.parseInt(params.get("temporalGap")));
     
     if(params.get("numReducers") != null){
     	commonConfig.setNumberOfReducers(Integer.parseInt(params.get("numReducers")));

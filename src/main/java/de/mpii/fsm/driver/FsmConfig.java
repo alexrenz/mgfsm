@@ -148,6 +148,7 @@ public class FsmConfig {
   private boolean  resumeOption;
   private boolean  keepFilesOption;
   private boolean  timestampInputOption;
+  private int	   temporalGap;
 
 
   //other user-interesting parameters
@@ -218,6 +219,7 @@ public class FsmConfig {
     this.resumeOption     = false;
     this.keepFilesOption  = true;
     this.timestampInputOption = false;
+    this.temporalGap      = 0;
     this.allowSplits      = false;
     this.debugLevel       = DEFAULT_DEBUG_LEVEL;
     this.indexingMethod   = IndexingMethod.FULL;
@@ -258,6 +260,7 @@ public class FsmConfig {
     this.resumeOption     = commonConfig.isResumeOption();
     this.keepFilesOption  = commonConfig.isKeepFilesOption();
     this.timestampInputOption = commonConfig.isTimestampInputOption();
+    this.temporalGap	  = commonConfig.getTemporalGap();
     this.allowSplits      = commonConfig.isAllowSplits();
     this.debugLevel       = commonConfig.getDebugLevel();
     this.indexingMethod   = commonConfig.getIndexingMethod();
@@ -405,6 +408,21 @@ public class FsmConfig {
    */
   public void setTimestampInputOption(boolean timestampInputOption) {
     this.timestampInputOption = timestampInputOption;
+  }
+  
+  /**
+   * 
+   * @return int
+   */
+  public int getTemporalGap() {
+    return temporalGap;
+  }
+  /**
+   * 
+   * @param temporalGap
+   */
+  public void setTemporalGap(int temporalGap) {
+    this.temporalGap = temporalGap;
   }
 
   /**
@@ -716,7 +734,5 @@ public class FsmConfig {
   public void setFlistPath(Path flistPath) {
     this.flistPath = flistPath;
   }
-  
-  
 
 }
