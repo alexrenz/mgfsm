@@ -134,10 +134,7 @@ Sample output:
 +   -(o)utput is the only mandatory option. It points to the location where the translated frequent sequences will be written.
 
 **Timestamp-encoded input format**
-<<<<<<< HEAD
 
-=======
->>>>>>> 404db8dc571e3cf906fde12971b4aea51c43280d
 Timestamp-encoded assumes sequences in the following format: 
 >       s1 3 item1 7 item2 7 item3 8 item4 15 item4
 >       s2 15 item2 16 item4 16 item2 16 item5 32 item6
