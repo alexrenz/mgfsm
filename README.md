@@ -124,7 +124,7 @@ Sample output:
 | partitionSize 	| p          	| Yes      	| 10000         	| Explicitly specify the partition size.                                                                                                                                                                       	|
 | indexing      	| id         	| Yes      	| full          	| Specify the indexing mode. Options are : 1. none 2. minmax 3. full                                                                                                                                           	|
 | split         	| sp         	| Yes      	| false         	| Explicitly specify whether or not to allow split by setting this flag.                                                                                                                                       	|
-| split         	| sp         	| Yes      	| false         	| Explicitly specify whether or not to allow split by setting this flag.                                                                                                                                       	|
+| timestampInput   	| ti         	| Yes      	| false         	| Specify whether to use the timestamp-encoded input format                                                                                                                                     	|
 
 **Additional Notes**
 

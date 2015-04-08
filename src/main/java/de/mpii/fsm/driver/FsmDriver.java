@@ -187,7 +187,7 @@ public final class FsmDriver extends AbstractJob {
           null);
     
     /* timestampInput for reading timestamp-encoded input files */
-    addOption("timestampInput", "ti", "(Optional) Specify whether you would like to use a timestamp-encoded input format like:"
+    addOption("timestampInput", "ti", "(Optional) Specify whether to use the timestamp-encoded input format like this:"
     			+ "\nseqId timestamp1 item1 timestamp2 item2 timestampN itemN");
 
     /*Developer-interesting options*/
