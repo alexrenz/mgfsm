@@ -133,8 +133,11 @@ Sample output:
 +   -(i)nput and -(r)esume are mutually exclusive.
 +   -(o)utput is the only mandatory option. It points to the location where the translated frequent sequences will be written.
 
-
-
+**Timestamp-encoded input format**
+Timestamp-encoded assumes sequences in the following format: 
+>       s1 3 item1 7 item2 7 item3 8 item4 15 item4
+>       s2 15 item2 16 item4 16 item2 16 item5 32 item6
+>       s3 1 item7 2 item2 5 item3 8 item4
 
 
 
