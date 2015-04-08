@@ -231,11 +231,11 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 			try {
 				BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream("dictionary")));
-				System.err.println("DICTIONARY");
+				//debug System.err.println("DICTIONARY");
 				while (br.ready()) {
 					String[] tokens = br.readLine().split("\t");
 					itemTIdMap.put(tokens[0], Integer.parseInt(tokens[3]));
-					System.err.println(tokens[0] + "\t\t" + tokens[3]);
+					//debug System.err.println(tokens[0] + "\t\t" + tokens[3]);
 					
 					// look for special key
 					if(tokens[0].equals("#")) {
@@ -252,7 +252,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			
 
 			// DEBUG
-			System.err.println("Maximum items per timestamp: " + maxItemsAtOneTimestamp + ", multiplyFactor: " + multiplyFactor);
+			//debug System.err.println("Maximum items per timestamp: " + maxItemsAtOneTimestamp + ", multiplyFactor: " + multiplyFactor);
 		}
 
 		@Override
