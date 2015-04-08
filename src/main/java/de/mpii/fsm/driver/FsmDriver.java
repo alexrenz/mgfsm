@@ -389,12 +389,6 @@ public final class FsmDriver extends AbstractJob {
          //Return a non-zero exit status to indicate failure
          return (1);
      }
-     if((params.get("timestampInput")!=null) && (params.get("gamma")!=null)){
-         System.out.println("Gamma (-g) value specified although using timestampInput (-ti). Please do not pass a gamma value when using timestampInput as it will be ignored.");
-         System.out.println("Exiting...");
-         //Return a non-zero exit status to indicate failure
-         return (1);
-      }
     /* ---------------------------------------------------------------------
      * Checks to make sure the i/o paths
      * exist and are consistent.

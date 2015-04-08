@@ -99,7 +99,7 @@ public class FsmJob {
 
         // read execution parameters for FSM algorithm sigma, gamma, lambda
         int sigma = commonConfig.getSigma();
-        int gamma = commonConfig.getGamma();
+        int gamma;// = commonConfig.getGamma(); // set below
         int lambda = commonConfig.getLambda();
         //int outputSequenceType = commonConfig.getOutputSequenceType();
         Type outputType = commonConfig.getType();
@@ -110,10 +110,11 @@ public class FsmJob {
 
         boolean useSequenceFiles = commonConfig.isUseSequenceFiles(); // by default true, false for FsmTester class
         int numberOfReducers = commonConfig.getNumberOfReducers(); // by default 90
+        boolean useTimestampInput = commonConfig.isTimestampInputOption();
 
         Job job = new Job();
         job.setJarByClass(FsmJob.class);
-        job.setJobName("MG-FSM (" + sigma + "," + gamma + "," + lambda + "," + debugPartId + ")");
+        //job.setJobName("MG-FSM (" + sigma + "," + gamma + "," + lambda + "," + debugPartId + ")"); //set below
 
         // set timeout to 60 minutes
         job.getConfiguration().setInt("mapreduce.task.timeout", 3600000);
@@ -126,7 +127,7 @@ public class FsmJob {
 
         // set parameters
         job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.sigma", sigma);
-        job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.gamma", gamma);
+        //job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.gamma", gamma); // set below
         job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.lambda", lambda);
         //job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.outputSequenceType", outputSequenceType);
         job.getConfiguration().setEnum("org.apache.mahout.fsm.partitioning.outputType", outputType);
@@ -158,6 +159,21 @@ public class FsmJob {
         colsToLoad[0] = Constants.DOC_FREQ;
         colsToLoad[1] = Constants.ITEM_ID;
         dicReader.load(job.getConfiguration(), dictionaryURI, colsToLoad, sigma, -1);
+        
+        // if using timestamp input format, calculate gamma from the temporal gap (and the max frequency)
+        if(useTimestampInput) {
+            int temporalGap = commonConfig.getTemporalGap();
+        	int maxF = dicReader.docFreqs[dicReader.posOf(0)];
+        	gamma = (temporalGap - 1) * (2*maxF - 1) + (3*maxF - 3);
+        }
+        // if using normal input, use configured gamma value
+        else {
+        	gamma = commonConfig.getGamma();
+        }
+        
+        job.setJobName("MG-FSM (" + sigma + "," + gamma + "," + lambda + "," + debugPartId + ")");
+        job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.gamma", gamma);
+        
 
         // Sequence file for frequent 1 items
         String fListURI = "fList";

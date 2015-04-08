@@ -196,7 +196,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			
 			// re-add dummy value
 			outKey.set("#");
-			outValue.set("0\t0\t" + maxItemsAtOneTimestamp);
+			outValue.set("0\t" + maxItemsAtOneTimestamp + "\t0");
 			context.write(outKey, outValue);
 		}
 	}
@@ -237,6 +237,10 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 					itemTIdMap.put(tokens[0], Integer.parseInt(tokens[3]));
 					System.err.println(tokens[0] + "\t\t" + tokens[3]);
 					
+					// look for special key
+					if(tokens[0].equals("#")) {
+						maxItemsAtOneTimestamp = Integer.parseInt(tokens[2]);
+					}
 				}
 				br.close();
 			} catch (Exception e) {
@@ -244,7 +248,6 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			}
 			
 			// retrieve the maxFrequency from the Dictionary
-			maxItemsAtOneTimestamp = itemTIdMap.get("#");
 			multiplyFactor = (2 * maxItemsAtOneTimestamp) - 1;
 			
 
