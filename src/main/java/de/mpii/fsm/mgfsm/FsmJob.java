@@ -166,6 +166,7 @@ public class FsmJob {
         	int maxF = dicReader.docFreqs[dicReader.posOf(0)];
         	gamma = (temporalGap - 1) * (2*maxF - 1) + (3*maxF - 3);
         	LOGGER.log(Level.INFO, "Gamma calculated from temporalGap(="+temporalGap+") and maximumFrequency(="+maxF+"): "+gamma);
+        	
         }
         // if using normal input, use configured gamma value
         else {
@@ -240,6 +241,12 @@ public class FsmJob {
             // partitions
             if (frequency < sigma) {
                 continue;
+            }
+            
+            // do not create a partition for the dummy item "#"
+            if (itemId == 0) {
+                LOGGER.log(Level.INFO, "Create no partition for item:" + itemId);
+            	continue;
             }
 
             // adding item and its frequency to the sequence file
