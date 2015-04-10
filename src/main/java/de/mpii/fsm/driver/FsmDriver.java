@@ -383,9 +383,10 @@ public final class FsmDriver extends AbstractJob {
              inputDir = new Path(params.get("resume")); 
            }
      }
-     if((params.get("timestampInput")!=null) && (params.get("temporalGap")==null)){
+     if((params.get("timestampInput")!="false") && (params.get("temporalGap")==null)){
          System.out.println("No temporalGap (-tg) specified despite using timestampInput (-ti). Please specify a temporal gap.");
          System.out.println("Exiting...");
+         System.out.println("timestampInput is '" + params.get("timestampInput") + "'");
          //Return a non-zero exit status to indicate failure
          return (1);
      }
@@ -507,7 +508,10 @@ public final class FsmDriver extends AbstractJob {
     commonConfig.setPartitionSize(Long.parseLong(params.get("partitionSize")));
     commonConfig.setAllowSplits(Boolean.parseBoolean(params.get("splits")));
     commonConfig.setTimestampInputOption(Boolean.parseBoolean(params.get("timestampInput")));
-    commonConfig.setTemporalGap(Integer.parseInt(params.get("temporalGap")));
+    
+    if(params.get("temporalGap") != null) {
+    	commonConfig.setTemporalGap(Integer.parseInt(params.get("temporalGap")));
+    }
     
     if(params.get("numReducers") != null){
     	commonConfig.setNumberOfReducers(Integer.parseInt(params.get("numReducers")));
@@ -543,6 +547,25 @@ public final class FsmDriver extends AbstractJob {
       if(!commonConfig.isResumeOption()) {
         mySequentialMiner.createDictionary(commonConfig.getInputPath());
         mySequentialMiner.createIdToItemMap();
+        
+        // If TimestampInput, calculate gamma from temporal gap and maximum frequency
+        if(commonConfig.isTimestampInputOption()) {
+        	int tg = commonConfig.getTemporalGap();
+        	int mf = 0;
+        	if(mySequentialMiner.getDictionary().getDictionary().containsKey("#")) {
+        		mf = (int) mySequentialMiner.getDictionary().getDictionary().get("#").getDocumentFreq();
+      	  	}
+        	else {
+      		  	System.err.println("ERROR: No maximum frequency found in dictionary. But maximum frequency is necessary to calculate gamma from the temporal gap.");
+      		  	System.err.println("Exiting...");
+      		  	System.exit(1);
+        	}
+        	
+        	int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
+        	System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
+        	mySequentialMiner.commonConfig.setGamma( gamma );
+        }
+        
         //If the input path is a corpus 
         //runSeqJob will recursively call encodeAndMine()
         //on all the files to bring together a encoded sequences file

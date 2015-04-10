@@ -95,6 +95,12 @@ public class Dictionary {
   // Contains the path name where the 
   // document files of the corpus are contained.
   private String corpusFolderPath;
+  
+  // Flag whether to use timestamp-encoded input format or not
+  private boolean useTimestampInput;
+  
+  // Maximum number of items per one timestamp
+  private int maximumFrequency;
 
   /**
    * @author Dhruv Gupta (dhgupta@mpi-inf.mpg.de)
@@ -172,6 +178,7 @@ public class Dictionary {
     this.dictionary       = new HashMap<String, DicItem>();
     this.dictionaryFinal  = new ArrayList<DicItem>();
     this.corpusFolderPath = null;
+    this.useTimestampInput = false;
   }
 
   /**
@@ -182,6 +189,18 @@ public class Dictionary {
     this.dictionary       = new HashMap<String, DicItem>();
     this.dictionaryFinal  = new ArrayList<DicItem>();
     this.corpusFolderPath = corpusFolderPath;
+    this.useTimestampInput = false;
+  }
+  
+  /**
+   * @param String corpusFolderPath - value to be assigned to the corpusFolderPath attribute
+   */
+  public Dictionary(String corpusFolderPath, boolean useTimestampInput)
+  {
+    this.dictionary       = new HashMap<String, DicItem>();
+    this.dictionaryFinal  = new ArrayList<DicItem>();
+    this.corpusFolderPath = corpusFolderPath;
+    this.useTimestampInput = useTimestampInput;
   }
 
 
@@ -219,6 +238,14 @@ public class Dictionary {
    */
   public void setCorpusFolderPath(String corpusFolderPath) {
     this.corpusFolderPath = corpusFolderPath;
+  }
+  
+  /**
+   * @return Int
+   * @param void
+   */
+  public int getMaximumFrequency() {
+	  return maximumFrequency;
   }
   //END OF GETTER & SETTERS
 
@@ -442,7 +469,14 @@ public class Dictionary {
 		// Fill out the values of ID in the final dictionary
 		// sort terms in descending order of their collection frequency
 		Set<String> temp = dictionary.keySet();
+		
+		// make sure the dummy item ends up at the end of the list
+		if(this.useTimestampInput && dictionary.containsKey("#")) {
+			dictionary.get("#").setCollectionFreq(0);
+		}
+		
 		String[] terms = temp.toArray(new String[temp.size()]);
+		
 
 		Arrays.sort(terms, new Comparator<String>() {
 
@@ -457,6 +491,11 @@ public class Dictionary {
 		for (int i = 0; i < terms.length; i++) {
 			DicItem dicItem = dictionary.get(terms[i]);
 			dicItem.setId(i + 1);
+		}
+		
+		// set id=0 for dummy item
+		if(this.useTimestampInput && dictionary.containsKey("#")) {
+			dictionary.get("#").setId(0);
 		}
 		
 		Arrays.sort(terms);
@@ -482,19 +521,60 @@ public class Dictionary {
       BufferedReader br = new BufferedReader(new InputStreamReader(in));
       
       String strLine;
-
+      int maxItemsAtOneTimestamp;
+      int itemsAtCurrentTimestamp;
+      String previousTimestamp;
+      String timestamp;
+      String item;
       
       while ((strLine = br.readLine()) != null) {
     	  
     	  String[] items = strLine.split("\\s+");
     	  
     	  OpenObjectIntHashMap<String> itemCounts = new OpenObjectIntHashMap<String>();
-    	  // ignore pos 0 which contains a sequence identifier
-          for (int i = 1; i < items.length; i++) {
-            // update counts of items
-            String item = items[i];
-            itemCounts.adjustOrPutValue(item, +1, +1);
-          }
+    	  
+    	  // standard input format
+    	  if(!this.useTimestampInput) {
+    	  
+				// ignore pos 0 which contains a sequence identifier
+				for (int i = 1; i < items.length; i++) {
+				  // update counts of items
+				  item = items[i];
+				  itemCounts.adjustOrPutValue(item, +1, +1);
+				}
+    	  }
+    	  // timestamp-encoded input format
+    	  else {
+    		  	maxItemsAtOneTimestamp = 0;
+				itemsAtCurrentTimestamp = 0;
+				previousTimestamp = "";
+				
+				// ignore pos 0 which contains a sequence identifier
+				// increase counter by 2 in each run due to the timestamp+item combination
+				for (int i = 1; i < items.length; i=i+2) {
+					// update counts of items
+					timestamp = items[i];
+					item = items[i+1];
+					if(timestamp.equals(previousTimestamp)) {
+						itemsAtCurrentTimestamp++;
+					}
+					else {
+						itemsAtCurrentTimestamp = 1;
+					}
+					if(itemsAtCurrentTimestamp > maxItemsAtOneTimestamp) {
+						maxItemsAtOneTimestamp = itemsAtCurrentTimestamp;
+					}
+					itemCounts.adjustOrPutValue(item, +1, +1);
+					previousTimestamp = timestamp;
+  			}
+  			
+  			// add dummy item "#" as max items value, in order to store the maximum 
+			//      frequency with the dictionary (in case of a job resume)
+  			itemCounts.put("#", maxItemsAtOneTimestamp);
+			// Store maximum frequency in the dictionary class
+			this.maximumFrequency = maxItemsAtOneTimestamp;
+    	  }
+    	  
           
           for (String term : itemCounts.keys()) {
         	  addItemToDictionary(term, itemCounts.get(term));
@@ -509,8 +589,15 @@ public class Dictionary {
 		  dicItem = new DicItem(term, cf, 1);
 		  dictionary.put(term, dicItem);
 	  } else {
-		  dicItem.setCollectionFreq(cf + dicItem.getCollectionFreq());
-		  dicItem.setDocumentFreq(dicItem.getDocumentFreq() + 1);
+		  // timestamp-input dummy item
+		  if(this.useTimestampInput && term.equals("#")) {
+			  dicItem.setCollectionFreq(Math.max(cf, dicItem.getCollectionFreq()));
+			  dicItem.setDocumentFreq(dicItem.getCollectionFreq());
+		  }
+		  else {
+			  dicItem.setCollectionFreq(cf + dicItem.getCollectionFreq());
+			  dicItem.setDocumentFreq(dicItem.getDocumentFreq() + 1);
+		  }
 	  }
 }
 
