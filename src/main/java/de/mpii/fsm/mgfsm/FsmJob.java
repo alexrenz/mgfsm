@@ -245,10 +245,6 @@ public class FsmJob {
             
             // do not create a partition for the dummy item "#"
             if (itemId == 0) {
-<<<<<<< HEAD
-=======
-                LOGGER.log(Level.INFO, "Create no partition for item:" + itemId);
->>>>>>> 35af275fd97410fea3ada9971e2d7fa89263e55b
             	continue;
             }
 
