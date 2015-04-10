@@ -165,6 +165,7 @@ public class FsmJob {
             int temporalGap = commonConfig.getTemporalGap();
         	int maxF = dicReader.docFreqs[dicReader.posOf(0)];
         	gamma = (temporalGap - 1) * (2*maxF - 1) + (3*maxF - 3);
+        	LOGGER.log(Level.INFO, "Gamma calculated from temporalGap(="+temporalGap+") and maximumFrequency(="+maxF+"): "+gamma);
         }
         // if using normal input, use configured gamma value
         else {

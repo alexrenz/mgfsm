@@ -339,14 +339,6 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 		    }
 			
-			//DEBUG 
-			StringBuilder sb2 = new StringBuilder();
-			sb2.append(id + ": ");
-			for(int item: itemIds.toArray(new int[0])) {
-				sb2.append(item + " ");
-			}
-			System.err.println(sb2);
-			
 			if (itemIds.size() > 0) {
 
 				outKey.set(id);
