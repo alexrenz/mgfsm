@@ -145,6 +145,7 @@ public class FsmConfig {
   private String   inputPath; 
   private String   outputPath;
   private String   intermediatePath;
+  private String   maximumFrequencyPath;
   private boolean  resumeOption;
   private boolean  keepFilesOption;
   private boolean  timestampInputOption;
@@ -214,6 +215,7 @@ public class FsmConfig {
     this.intermediatePath    = null;
     this.dictionaryPath      = null;
     this.type                = Type.ALL;
+    this.maximumFrequencyPath = null;
 
     //other book-keeping parameters
     this.resumeOption     = false;
@@ -255,6 +257,7 @@ public class FsmConfig {
     this.intermediatePath     = commonConfig.getIntermediatePath();
     this.dictionaryPath       = commonConfig.getDictionaryPath();
     this.type                 = commonConfig.getType();
+    this.maximumFrequencyPath = commonConfig.getMaximumFrequencyPath();
 
     //other book-keeping parameters
     this.resumeOption     = commonConfig.isResumeOption();
@@ -536,6 +539,24 @@ public class FsmConfig {
   public void setDictionaryPath(String dictionaryPath) {
     this.dictionaryPath = dictionaryPath;
   }
+  
+  
+  /**
+   * 
+   * @return String
+   */
+  public String getMaximumFrequencyPath() {
+    return maximumFrequencyPath;
+  }
+
+  /**
+   * 
+   * @param String dictionaryPath
+   */
+  public void setMaximumFrequencyPath(String maximumFrequencyPath) {
+    this.maximumFrequencyPath = maximumFrequencyPath;
+  }
+  
 
   /**
    * 

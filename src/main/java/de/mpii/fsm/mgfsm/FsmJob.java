@@ -1,6 +1,7 @@
 package de.mpii.fsm.mgfsm;
 
 
+import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.net.URI;
 import java.util.Arrays;
@@ -124,6 +125,7 @@ public class FsmJob {
         job.getConfiguration().setBoolean("mapreduce.map.speculative", false);
         job.getConfiguration().setBoolean("mapreduce.reduce.speculative", false);
         job.getConfiguration().set("dictionary", commonConfig.getDictionaryPath());
+        job.getConfiguration().set("maximumFrequency", commonConfig.getMaximumFrequencyPath());
 
         // set parameters
         job.getConfiguration().setInt("org.apache.mahout.fsm.partitioning.sigma", sigma);
@@ -162,8 +164,22 @@ public class FsmJob {
         
         // if using timestamp input format, calculate gamma from the temporal gap (and the max frequency)
         if(useTimestampInput) {
-
-        	LOGGER.log(Level.INFO, "PostOf(0) is "+Arrays.toString(dicReader.itemIds));
+        	LOGGER.log(Level.INFO, "maxFrequencyURI is "+conf.get("maximumFrequency"));
+        	
+        	LOGGER.log(Level.INFO, "dictionaryURI is "+conf.get("dictionary"));
+        	Configuration configuration = new Configuration();
+        	URI uri = new URI(conf.get("maximumFrequency"));
+        	
+        	FileSystem hdfs = FileSystem.get(uri, configuration);
+        	InputStream inputStream = null;
+        	
+    		Path path = new Path(uri);
+    		inputStream = hdfs.open(path);
+    		IOUtils.copyBytes(inputStream, System.out, 4096, false);
+    		IOUtils.closeStream(inputStream);
+        	
+        	
+        	
             int temporalGap = commonConfig.getTemporalGap();
         	int maxF = dicReader.docFreqs[dicReader.posOf(0)];
         	gamma = (temporalGap - 1) * (2*maxF - 1) + (3*maxF - 3);

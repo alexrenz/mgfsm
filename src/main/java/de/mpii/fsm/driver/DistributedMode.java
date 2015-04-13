@@ -120,6 +120,10 @@ public class DistributedMode
                                                .getOutputPath()
                                                .concat("/"+Constants
                                                .ENCODED_FREQ_SEQ_FILE_PATH));
+    FsmJob.getCommonConfig().setMaximumFrequencyPath(this.commonConfig
+                                               .getOutputPath()
+                                               .concat("/"+Constants
+                                               .MAXIMUM_FREQUENCY_FILE_PATH));
 
     //Prepare the arguments for the seqTranslatorArgs map--reduce job to run.
     String seqTranslatorArgs[] = { 	this.commonConfig
@@ -209,6 +213,10 @@ public class DistributedMode
                                                    .getInputPath()
                                                    .concat("/"+ Constants
                                                    .OUTPUT_DICTIONARY_FILE_PATH));
+    FsmJob.getCommonConfig().setMaximumFrequencyPath(this.commonConfig
+                                                   .getInputPath()
+                                                   .concat("/"+ Constants
+                                                   .MAXIMUM_FREQUENCY_FILE_PATH));
     
     
     

@@ -78,6 +78,7 @@ package de.mpii.fsm.util;
 	  public static final String ENCODED_FREQ_SEQ_FILE_NAME = "part-r-00000";
 	  
 	  
-	  
+	  /* File name of maximumFrequency for timestamp-encoded input format */
+	  public static final String MAXIMUM_FREQUENCY_FILE_PATH = "wc/mf/maximumFrequency-r-00000";
 	  
 }

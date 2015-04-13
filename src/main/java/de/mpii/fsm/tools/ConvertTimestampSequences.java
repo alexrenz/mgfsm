@@ -30,6 +30,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -131,6 +132,14 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		
 		// special key
 		private final Text specialKey = new Text("#");
+		
+		// Multiple Outputs in order to output maximumFrequency to other file
+		private MultipleOutputs<Text, Text> out;
+
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException {
+			out = new MultipleOutputs<Text, Text>(context);
+		}
 
 		@Override
 		protected void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException,
@@ -195,9 +204,11 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			}
 			
 			// re-add dummy value
-			outKey.set("#");
-			outValue.set("0\t" + maxItemsAtOneTimestamp + "\t0");
-			context.write(outKey, outValue);
+			outKey.set("maximumFrequency");
+			outValue.set(Integer.toString(maxItemsAtOneTimestamp));
+			//context.write(outKey, outValue);
+			
+			out.write(outKey, outValue, "mf/maximumFrequency");
 		}
 	}
 
