@@ -457,26 +457,28 @@ public class SequentialMode {
 
   		    }
         }
-        
-        
-        // todo: improve on this or use a list
-        // remove spare 0's in transaction
-        
-        // count 0s at the end
-        int nzeros = 0;
-        for(int i=transaction.length-1; transaction[i]==0; i--) {
-        	nzeros++;
+    	
+    	// In timestamp-encoded format, there might be trailing 0s in 'transaction' 
+        // => Remove trailing 0s
+        if(useTimestampInput) {
+        	
+            // count 0s at the end
+            int nzeros = 0;
+            for(int i=transaction.length-1; transaction[i]==0; i--) {
+            	nzeros++;
+            }
+            // remove the trailing 0s
+            int[] transaction_withzeros = transaction;
+            transaction = new int[transaction_withzeros.length-nzeros];
+            System.arraycopy(transaction_withzeros, 0, transaction, 0, transaction_withzeros.length-nzeros);
         }
-        int[] transaction_nozeros = new int[transaction.length-nzeros];
-        for(int i=0; i<(transaction.length-nzeros); i++) {
-        	transaction_nozeros[i] = transaction[i];
-        }
+        
         
         //write to the transaction to the local disk
-        outputBr.write(Arrays.toString(transaction_nozeros) + "\n");
+        outputBr.write(Arrays.toString(transaction) + "\n");
         
         //debug
-        System.out.println(splits[0] + "\t" + Arrays.toString(transaction_nozeros));
+        System.out.println(splits[0] + "\t" + Arrays.toString(transaction));
 
         // adding transactions to bfsMiner
         myBfsMiner.addTransaction(transaction, 0, transaction.length, 1);

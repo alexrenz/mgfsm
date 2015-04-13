@@ -162,6 +162,8 @@ public class FsmJob {
         
         // if using timestamp input format, calculate gamma from the temporal gap (and the max frequency)
         if(useTimestampInput) {
+
+        	LOGGER.log(Level.INFO, "PostOf(0) is "+Arrays.toString(dicReader.itemIds));
             int temporalGap = commonConfig.getTemporalGap();
         	int maxF = dicReader.docFreqs[dicReader.posOf(0)];
         	gamma = (temporalGap - 1) * (2*maxF - 1) + (3*maxF - 3);

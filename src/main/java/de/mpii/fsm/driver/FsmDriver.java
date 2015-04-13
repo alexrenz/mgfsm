@@ -563,7 +563,10 @@ public final class FsmDriver extends AbstractJob {
         	
         	int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
         	System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
+        	
+        	// Pass the calculated gamma to the Sequential Mode config and to the miner object
         	mySequentialMiner.commonConfig.setGamma( gamma );
+        	mySequentialMiner.myBfsMiner.setParametersAndClear(commonConfig.getSigma(), gamma, commonConfig.getLambda());
         }
         
         //If the input path is a corpus 

@@ -231,11 +231,11 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 			try {
 				BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream("dictionary")));
-				//debug System.err.println("DICTIONARY");
+				System.err.println("DICTIONARY");
 				while (br.ready()) {
 					String[] tokens = br.readLine().split("\t");
 					itemTIdMap.put(tokens[0], Integer.parseInt(tokens[3]));
-					//debug System.err.println(tokens[0] + "\t\t" + tokens[3]);
+					System.err.println(tokens[0] + "\t\t" + tokens[3]);
 					
 					// look for special key
 					if(tokens[0].equals("#")) {
@@ -249,10 +249,6 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			
 			// retrieve the maxFrequency from the Dictionary
 			multiplyFactor = (2 * maxItemsAtOneTimestamp) - 1;
-			
-
-			// DEBUG
-			//debug System.err.println("Maximum items per timestamp: " + maxItemsAtOneTimestamp + ", multiplyFactor: " + multiplyFactor);
 		}
 
 		@Override
@@ -332,8 +328,6 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 		        // first item, no time delta appended
 		        prevTime = currTime;
-		        //item = Long.parseLong(tokens[i + 1]);
-		        //sb.append(item + (i != tokens.length - 1 ? " " : ""));
 		        itemIds.add(itemTIdMap.get(tokens[i+1]));
 		      }
 
@@ -455,6 +449,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		// add files to distributed cache
 		for (FileStatus file : FileSystem.get(getConf()).listStatus(new Path(output + "/wc"))) {
 			if (file.getPath().toString().contains("part")) {
+				LOGGER.log(Level.WARNING, "Adding file to DistributedCache: " + file.getPath().toUri() + "#dictionary");
 				DistributedCache.addCacheFile(new URI(file.getPath().toUri() + "#dictionary"), job2.getConfiguration());
 			}
 		}
