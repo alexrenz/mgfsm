@@ -34,6 +34,7 @@ import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+import de.mpii.fsm.util.Constants;
 import de.mpii.fsm.util.DfsUtils;
 import de.mpii.fsm.util.IntArrayWritable;
 
@@ -52,6 +53,10 @@ import de.mpii.fsm.util.IntArrayWritable;
 public class ConvertTimestampSequences extends Configured implements Tool {
 
 	static final Logger LOGGER = Logger.getLogger(ConvertTimestampSequences.class.getSimpleName());
+	
+	public static enum DICTIONARY {
+		  MAXIMUMFREQUENCY
+	};
 
 	//////
 	/////
@@ -147,8 +152,6 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			int cf = 0;
 			int df = 0;
 			
-		   
-			
 			// all "normal" keys
 			if(!key.equals(specialKey)) {
 				for (IntWritable value : values) {
@@ -173,7 +176,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 
 		@Override
 		protected void cleanup(Context context) throws IOException, InterruptedException {
-			// take care of the special case "#" (max items)
+			// Extract the special case "#" (maxFrequency)
 			int maxItemsAtOneTimestamp = cfs.get("#");
 			cfs.removeKey("#");
 			
@@ -203,12 +206,11 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 				context.write(outKey, outValue);
 			}
 			
-			// re-add dummy value
+			// Write maximum frequency to separate output
 			outKey.set("maximumFrequency");
 			outValue.set(Integer.toString(maxItemsAtOneTimestamp));
-			//context.write(outKey, outValue);
-			
 			out.write(outKey, outValue, "mf/maximumFrequency");
+			out.close();
 		}
 	}
 
@@ -229,7 +231,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		private final OpenObjectIntHashMap<String> itemTIdMap = new OpenObjectIntHashMap<String>();
 		
 		// the maximum number of items per at one timestamp (identified in the first MapReduce job)
-		private int maxItemsAtOneTimestamp; 
+		private int maxFrequency; 
 		private int multiplyFactor;
 		
 
@@ -239,19 +241,13 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		protected void setup(Context context) throws IOException, InterruptedException {
 			
 			itemSeparator = context.getConfiguration().get("de.mpii.tools.itemSeparator", "\t");
-
+			maxFrequency = context.getConfiguration().getInt("de.mpii.tools.maxFrequency", 0);
+			
 			try {
 				BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream("dictionary")));
-				System.err.println("DICTIONARY");
 				while (br.ready()) {
 					String[] tokens = br.readLine().split("\t");
 					itemTIdMap.put(tokens[0], Integer.parseInt(tokens[3]));
-					System.err.println(tokens[0] + "\t\t" + tokens[3]);
-					
-					// look for special key
-					if(tokens[0].equals("#")) {
-						maxItemsAtOneTimestamp = Integer.parseInt(tokens[2]);
-					}
 				}
 				br.close();
 			} catch (Exception e) {
@@ -259,7 +255,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			}
 			
 			// retrieve the maxFrequency from the Dictionary
-			multiplyFactor = (2 * maxItemsAtOneTimestamp) - 1;
+			multiplyFactor = (2 * maxFrequency) - 1;
 		}
 
 		@Override
@@ -420,13 +416,28 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 			job1.getConfiguration().set("mapreduce.cluster.reducememory.mb", "4096");
 
 			// start job
-
 			job1.waitForCompletion(true);
 		}
-
+		
+		
 		/////
 		//// PHASE 2: Transform document collection
 		///
+		
+
+		// Read maximum frequency from the created file
+		int maxFrequency = 0;
+		try {
+			BufferedReader br = new BufferedReader(new InputStreamReader(FileSystem.get(getConf()).open(new Path(output + "/" + Constants.MAXIMUM_FREQUENCY_FILE_PATH))));
+			String[] tokens = br.readLine().split("\t");
+			maxFrequency = Integer.parseInt(tokens[1]);
+			br.close();
+		} catch (Exception e) {
+			LOGGER.log(Level.SEVERE, "Maximum Frequency File not found at " + output + "/" + Constants.MAXIMUM_FREQUENCY_FILE_PATH);
+			throw new RuntimeException(e);
+		}
+
+		
 		// Job job2 = new Job(getConf());
 		Job job2 = Job.getInstance(getConf());
 
@@ -435,6 +446,7 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		job2.setJarByClass(this.getClass());
 
 		job2.getConfiguration().setStrings("de.mpii.tools.itemSeparator", itemSeparator);
+		job2.getConfiguration().setStrings("de.mpii.tools.maxFrequency", String.valueOf(maxFrequency));
 
 		// set input and output paths
 		FileInputFormat.setInputPaths(job2, DfsUtils.traverse(new Path(input), job2.getConfiguration()));
@@ -460,7 +472,6 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		// add files to distributed cache
 		for (FileStatus file : FileSystem.get(getConf()).listStatus(new Path(output + "/wc"))) {
 			if (file.getPath().toString().contains("part")) {
-				LOGGER.log(Level.WARNING, "Adding file to DistributedCache: " + file.getPath().toUri() + "#dictionary");
 				DistributedCache.addCacheFile(new URI(file.getPath().toUri() + "#dictionary"), job2.getConfiguration());
 			}
 		}
@@ -481,3 +492,4 @@ public class ConvertTimestampSequences extends Configured implements Tool {
 		System.exit(exitCode);
 	}
 }
+

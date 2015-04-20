@@ -13,6 +13,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -101,6 +102,7 @@ public class Dictionary {
   
   // Maximum number of items per one timestamp
   private int maximumFrequency;
+  private List<Integer> maximumFrequenciesList = new ArrayList<Integer>();
 
   /**
    * @author Dhruv Gupta (dhgupta@mpi-inf.mpg.de)
@@ -465,15 +467,15 @@ public class Dictionary {
 
 		// Recursively process all the text files in the corpus
 		processCorpus(file);
+		
+		// If using temporal input, determine the maximumFrequency
+		if(this.useTimestampInput) {
+			this.maximumFrequency = Collections.max(this.maximumFrequenciesList);
+		}
 
 		// Fill out the values of ID in the final dictionary
 		// sort terms in descending order of their collection frequency
 		Set<String> temp = dictionary.keySet();
-		
-		// make sure the dummy item ends up at the end of the list
-		if(this.useTimestampInput && dictionary.containsKey("#")) {
-			dictionary.get("#").setCollectionFreq(0);
-		}
 		
 		String[] terms = temp.toArray(new String[temp.size()]);
 		
@@ -491,11 +493,6 @@ public class Dictionary {
 		for (int i = 0; i < terms.length; i++) {
 			DicItem dicItem = dictionary.get(terms[i]);
 			dicItem.setId(i + 1);
-		}
-		
-		// set id=0 for dummy item
-		if(this.useTimestampInput && dictionary.containsKey("#")) {
-			dictionary.get("#").setId(0);
 		}
 		
 		Arrays.sort(terms);
@@ -568,11 +565,8 @@ public class Dictionary {
 					previousTimestamp = timestamp;
   			}
   			
-  			// add dummy item "#" as max items value, in order to store the maximum 
-			//      frequency with the dictionary (in case of a job resume)
-  			itemCounts.put("#", maxItemsAtOneTimestamp);
 			// Store maximum frequency in the dictionary class
-			this.maximumFrequency = maxItemsAtOneTimestamp;
+			this.maximumFrequenciesList.add(maxItemsAtOneTimestamp);
     	  }
     	  
           
@@ -612,6 +606,7 @@ public class Dictionary {
    */
   public void writeDictionary(String outputFolderName)
   {
+	// Write the dictionary output
     String outputFileName = outputFolderName;
 
     File outFile    = new File(outputFileName.concat("/" + Constants.OUTPUT_DICTIONARY_FILE_PATH));
@@ -642,7 +637,31 @@ public class Dictionary {
     {         
       e.printStackTrace();
     }
-    // End of writing to the output file.
+    // End of writing to the dictionary output file.
+    
+    
+    // For Timestamp-encoded input format: write maximum frequency
+    if(this.useTimestampInput) {
+    	outFile = new File(outputFileName.concat("/" + Constants.MAXIMUM_FREQUENCY_FILE_PATH));
+    	outFile.getParentFile().mkdirs();
+    	try 
+	    {
+	      // Open the file
+	      OutputStream fstreamOutput = new FileOutputStream(outFile);
+
+	      // Get the object of DataOutputStream
+	      DataOutputStream out = new DataOutputStream(fstreamOutput);
+	      BufferedWriter br    = new BufferedWriter(new OutputStreamWriter(out));       
+	      
+	      br.write("MaximumFrequency" + "\t" + String.valueOf(this.maximumFrequency));
+	      br.close();
+	    }   
+	    catch (IOException e) 
+	    {         
+	      e.printStackTrace();
+	    }
+    	
+    }
   }
 
   /**

@@ -189,7 +189,7 @@ public final class FsmDriver extends AbstractJob {
           null);
     
     /* timestampInput for reading timestamp-encoded input files */
-    addOption("timestampInput", "ti", "(Optional) Specify whether to use the timestamp-encoded input format like this:"
+    addFlag("timestampInput", "ti", "(Optional) Specify whether to use the timestamp-encoded input format like this:"
     			+ "\nseqId timestamp1 item1 timestamp2 item2 timestampN itemN");
     
     addOption("temporalGap", 
@@ -310,7 +310,7 @@ public final class FsmDriver extends AbstractJob {
     else {
       params.set("keepFiles", null);
     }
-    if (hasOption("timestampInput")) {
+    if(hasOption("timestampInput")) {
       params.set("timestampInput", "true");
     } 
     else {
@@ -499,6 +499,9 @@ public final class FsmDriver extends AbstractJob {
     commonConfig.setDictionaryPath(commonConfig
                                   .getIntermediatePath()
                                   .concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH));
+    commonConfig.setMaximumFrequencyPath(commonConfig
+    							  .getIntermediatePath()
+    							  .concat("/"+Constants.MAXIMUM_FREQUENCY_FILE_PATH));
     
     //Supply the rest of the algorithm specific options to commonConfig
     commonConfig.setSigma(Integer.parseInt(params.get("support")));
@@ -551,17 +554,10 @@ public final class FsmDriver extends AbstractJob {
         // If TimestampInput, calculate gamma from temporal gap and maximum frequency
         if(commonConfig.isTimestampInputOption()) {
         	int tg = commonConfig.getTemporalGap();
-        	int mf = 0;
-        	if(mySequentialMiner.getDictionary().getDictionary().containsKey("#")) {
-        		mf = (int) mySequentialMiner.getDictionary().getDictionary().get("#").getDocumentFreq();
-      	  	}
-        	else {
-      		  	System.err.println("ERROR: No maximum frequency found in dictionary. But maximum frequency is necessary to calculate gamma from the temporal gap.");
-      		  	System.err.println("Exiting...");
-      		  	System.exit(1);
-        	}
+        	int mf = mySequentialMiner.getDictionary().getMaximumFrequency();
         	
         	int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
+        	
         	System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
         	
         	// Pass the calculated gamma to the Sequential Mode config and to the miner object

@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -249,7 +250,6 @@ public class SequentialMode {
     {
       Map.Entry<String, Dictionary.DicItem> pairs = (Map.Entry<String, Dictionary.DicItem>)it.next();
 
-      System.err.println(pairs.getValue().getId() + ": " + pairs.getKey());
       this.idToItemMap.put(pairs.getValue().getId(), pairs.getKey());
     }
 
@@ -343,8 +343,32 @@ public class SequentialMode {
 	  int repeats = 0;
 	  int multiplyFactor = 0;
 	  
-	  if(this.commonConfig.isTimestampInputOption() && this.dictionary.getDictionary().containsKey("#")) {
-		  multiplyFactor = (2 * (int) this.dictionary.getDictionary().get("#").getDocumentFreq()) - 1;
+	  // For timestamp-encoded input: 
+	  // If resuming the mining from a previously created dictionary, read the maximumFrequency.
+	  // Otherwise, use the saved value
+	  if(this.commonConfig.isTimestampInputOption()) {
+		  int maximumFrequency = 0;
+		  if(this.commonConfig.isResumeOption()) {
+			  // Read from file 
+			  String mfPath = this.commonConfig.getIntermediatePath().concat("/"+Constants.MAXIMUM_FREQUENCY_FILE_PATH);
+			  BufferedReader reader = new BufferedReader(new FileReader(mfPath));
+			  try {
+				  String line = reader.readLine();
+				  maximumFrequency = Integer.parseInt(line.split("\t")[1]);
+			  }
+			  catch (IOException e) {
+				  System.err.println("Maximum frequency file not found at " + mfPath);
+				  e.printStackTrace();
+			  }
+			  finally {
+				  reader.close();
+			  }
+		  }
+		  else {
+			  maximumFrequency = this.dictionary.getMaximumFrequency();
+		  }
+		  	
+		  multiplyFactor = (2 * maximumFrequency) - 1;
 	  }
 	  else if(this.commonConfig.isTimestampInputOption()) {
 		  System.err.println("ERROR: No maximum frequency found in dictionary.");
