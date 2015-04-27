@@ -262,33 +262,56 @@ public class SequentialMode {
   }
 
   /**
+   * Non-recursive function to initiate the enconding and mining
+   * 
+   * @param dir A file object defining the top directory
+   * @throws IOException 
+   * @throws InterruptedException 
+   **/
+  public void runSeqJob(File dir) throws IOException, InterruptedException
+  {
+    // Prepare the miner
+	/*  Clear the bfs object for use     */
+    myBfsMiner.clear();
+                                                                  
+    String dicFilePath = this.commonConfig.getIntermediatePath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH);
+    int sigma = this.commonConfig.getSigma();
+    
+    myBfsMiner.setFlistMap(this.dictionary.getFListMap(dicFilePath, sigma));
+	  
+	readPathRecursively(dir);
+    
+    // mine sequence and SequenceWriter will display (sequence, support)
+    myBfsMiner.mineAndClear(this.seqWriter);
+  }
+  
+  /**
    * Recursive function to descend into the directory tree and find all the files 
    * that end with ".txt"
    * 
    * @param dir A file object defining the top directory
- * @throws IOException 
+   * @throws IOException 
    **/
-  public void runSeqJob(File dir) throws IOException
-  {
-    String pattern = ".txt";
-    
-    if(dir.isFile() && dir.getName().endsWith(pattern)){
-      encodeAndMine(dir);
-    }
-    else{
-      File listFile[] = dir.listFiles();
-      if (listFile != null) {
-        for (int i=0; i<listFile.length; i++) {
-          if (listFile[i].isDirectory()) {
-            runSeqJob(listFile[i]);
-          } else {
-            if (listFile[i].getName().endsWith(pattern)) {
-              encodeAndMine(listFile[i]);
-            }
-          }
-        }
-      }
-    }
+  public void readPathRecursively(File dir) throws IOException {
+	  String pattern = ".txt";
+	    
+	    if(dir.isFile() && dir.getName().endsWith(pattern)){
+	      encodeAndMine(dir);
+	    }
+	    else{
+	      File listFile[] = dir.listFiles();
+	      if (listFile != null) {
+	        for (int i=0; i<listFile.length; i++) {
+	          if (listFile[i].isDirectory()) {
+	        	  readPathRecursively(listFile[i]);
+	          } else {
+	            if (listFile[i].getName().endsWith(pattern)) {
+	              encodeAndMine(listFile[i]);
+	            }
+	          }
+	        }
+	      }
+	    }
   }
 
   /**
@@ -299,14 +322,6 @@ public class SequentialMode {
  * @throws IOException 
    */
   public void encodeAndMine(File file) throws IOException {
-    
-    /*  Clear the bfs object for use     */
-    myBfsMiner.clear();
-                                                                  
-    String dicFilePath = this.commonConfig.getIntermediatePath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH);
-    int sigma = this.commonConfig.getSigma();
-    
-    myBfsMiner.setFlistMap(this.dictionary.getFListMap(dicFilePath, sigma));
 
     try {
       Configuration conf = new Configuration();
@@ -500,9 +515,6 @@ public class SequentialMode {
         
         //write to the transaction to the local disk
         outputBr.write(Arrays.toString(transaction) + "\n");
-        
-        //debug
-        System.out.println(splits[0] + "\t" + Arrays.toString(transaction));
 
         // adding transactions to bfsMiner
         myBfsMiner.addTransaction(transaction, 0, transaction.length, 1);
@@ -510,9 +522,6 @@ public class SequentialMode {
       br.close();
 
       outputBr.close();
-
-      // mine sequence and SequenceWriter will display (sequence, support)
-      myBfsMiner.mineAndClear(this.seqWriter);
 
     } 
     catch (Exception e) {
@@ -578,6 +587,7 @@ public class SequentialMode {
         for(int i = 1; i < splits.length; ++i) {
           transaction[index++] = Integer.parseInt(splits[i]);
         }
+        
         // adding transactions to bfsMiner
         myBfsMiner.addTransaction(transaction, 0, transaction.length, 1);
       }

@@ -18,7 +18,10 @@
 
 package de.mpii.fsm.driver;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -581,9 +584,35 @@ public final class FsmDriver extends AbstractJob {
         mySequentialMiner.setIdToItemMap(new Dictionary()
                                         .readDictionary(commonConfig
                                                        .getInputPath()
-                                                       .concat(
-                                                               "/"+Constants
-                                                                  .OUTPUT_DICTIONARY_FILE_PATH)));
+                                                       .concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH)));
+        
+        // If using TimestampInput, read maximum frequency from written file
+        // 	 and calculate gamma from the tempral gap and the max freq
+        if(commonConfig.isTimestampInputOption()) {
+        	int tg = commonConfig.getTemporalGap();
+        	int mf = 0;
+        	
+        	String mfPath = commonConfig.getInputPath().concat("/"+Constants.MAXIMUM_FREQUENCY_FILE_PATH);
+        	BufferedReader reader = new BufferedReader(new FileReader(mfPath));
+        	try {
+			  String line = reader.readLine();
+			  mf = Integer.parseInt(line.split("\t")[1]);
+        	}
+        	catch (IOException e) {
+			  System.err.println("Maximum frequency file not found at " + mfPath);
+			  e.printStackTrace();
+        	}
+        	finally {
+			  reader.close();
+        	}
+        	int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
+        	
+        	System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
+        	
+        	// Pass the calculated gamma to the Sequential Mode config and to the miner object
+        	mySequentialMiner.commonConfig.setGamma( gamma );
+        	mySequentialMiner.myBfsMiner.setParametersAndClear(commonConfig.getSigma(), gamma, commonConfig.getLambda());
+        }
         
         mySequentialMiner.encodeAndMine(mySequentialMiner.getCommonConfig().getInputPath());
       }
