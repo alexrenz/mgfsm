@@ -384,6 +384,7 @@ public class SequentialMode {
 		  }
 		  	
 		  multiplyFactor = (2 * maximumFrequency) - 1;
+		  System.out.println("MultiplyFactor = " + multiplyFactor);
 	  }
 	  else if(this.commonConfig.isTimestampInputOption()) {
 		  System.err.println("ERROR: No maximum frequency found in dictionary.");
