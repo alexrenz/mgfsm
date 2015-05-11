@@ -135,13 +135,15 @@ public final class FsmDriver extends AbstractJob {
 
     /* Hadooop-config options */
     addOutputOption();
+    addInputOption();
     
     /*User-interesting options*/
-    addOption("input",
+    /* - replaced by hadoop default option
+     * addOption("input",
               "i",
               "(Optional) Specify the path from where the input is to be read"
               + "\n NOTE: This option can not be used with -(r)esume option.",
-              null);
+              null);*/
     
     addOption("support", 
               "s", 
@@ -175,14 +177,14 @@ public final class FsmDriver extends AbstractJob {
               "\nDefault Value : a -(a)ll\n",
               FsmConfig.DEFAULT_TYPE);
 
-    /* keepFiles default value is null.
-     * It will be set to a temporary location, in case
+    /* keepEncoded default value is null.
+     * It will be set to the output location in case
      * no path is specified.*/
-    addOption("keepFiles", "k", "(Optional) Keep the intermediary files "
-        + "for later use or runs. The files stored are:"
-        + "\n1. Dictionary \n2. Encoded Sequences \n "
-        + "Specify the intermediate path where to keep these files :",
-          null);
+    addFlag("keepEncoded", "k", "Specify whether to store the intermediary files for later use or runs. If no parameter is passed, the intermediary files are stored in a sub directory of the output folder. If a path is passed as a parameter, the files will be stored at the passed path. The files stored are: 1. Dictionary 2. Encoded Sequences");
+    
+    addOption("keepEncodedPath", 
+            "kp", 
+            "Specify where to store the encoded intermediary files.");
 
     /* resume points to the location where the 
      * intermediary files are located*/
@@ -190,6 +192,13 @@ public final class FsmDriver extends AbstractJob {
         + "runs of the MG-FSM algorithm on"
         + " already encoded transaction file located in the folder specified in input.\n",
           null);
+    
+
+    /* Only do the mining */
+    addFlag("mineOnly", "mo", "If this flag is given, only the encoding phase is executed. MG-FSM then stores the dictionary and the encoded sequences in the specified output folder.");
+    
+    /* Only do the encoding */
+    addFlag("encodeOnly", "eo", "If this flag is given, only the mining phase is executed. MG-FSM then uses the dictionary and the encoded sequences at the specified input folder and mines the sequences with the given parameters.");
     
     /* timestampInput for reading timestamp-encoded input files */
     addFlag("timestampInput", "ti", "(Optional) Specify whether to use the timestamp-encoded input format like this:"
@@ -218,6 +227,8 @@ public final class FsmDriver extends AbstractJob {
 
     
     addOption("numReducers", "N", "(Optional) Number of reducers to be used by MG-FSM. Default value: 90 ", "90");
+    
+    addOption("miningAlgorithm", "ma", "(Optional) Specify the mining algorithm. Possible values: bfs, dfs, psm", "bfs");
 
     /*------------------------------------------------------------
      * ERROR CHECKS
@@ -230,7 +241,7 @@ public final class FsmDriver extends AbstractJob {
                          " E R R O R " +
                          "\n------------\n");
       System.out.println("One of the mandatory options is NOT specified");
-      System.out.println("e.g. the input option MUST be specified.");
+      System.out.println("e.g. the output and input options MUST be specified.");
       //Return a non-zero exit status to indicate failure
       return 1;
     }
@@ -239,13 +250,6 @@ public final class FsmDriver extends AbstractJob {
     if(hasOption("tempDir")){
       String tempDirPath = getOption("tempDir");
       params.set("tempDir", tempDirPath);
-    }
-    if(hasOption("input")){
-      String inputString = getOption("input");
-      params.set("input", inputString);
-    }
-    else{
-      params.set("input", null);
     }
     if (hasOption("support")) {
       String supportString = getOption("support");
@@ -284,6 +288,13 @@ public final class FsmDriver extends AbstractJob {
       }
       params.set("lambda", lambdaString);
     }  
+    if(hasOption("mineOnly")) {
+        params.set("mineOnly", "true");
+      } 
+    if(hasOption("encodeOnly")) {
+        params.set("encodeOnly", "true");
+        commonConfig.setEncodeOnlyOption(true);
+      } 
     if(hasOption("execMode")){
       String modeString = getOption("execMode");
       params.set("execMode", modeString);
@@ -306,12 +317,19 @@ public final class FsmDriver extends AbstractJob {
     else {
       params.set("split", "false");
     }
-    if (hasOption("keepFiles")) {
-      String keepFilesString = getOption("keepFiles");
-      params.set("keepFiles", keepFilesString);
+    if (hasOption("keepEncoded")) {
+      params.set("keepEncoded", "true");
+      commonConfig.setKeepEncodedOption(true);
     } 
     else {
-      params.set("keepFiles", null);
+      params.set("keepEncoded", null);
+    }
+    if (hasOption("keepEncodedPath")) {
+      String keepEncodedString = getOption("keepEncodedPath");
+      params.set("keepEncodedPath", keepEncodedString);
+    } 
+    else {
+      params.set("keepEncodedPath", null);
     }
     if(hasOption("timestampInput")) {
       params.set("timestampInput", "true");
@@ -330,13 +348,6 @@ public final class FsmDriver extends AbstractJob {
 	    }
 	    params.set("temporalGap", temporalGapString);
 	  }
-    if (hasOption("resume")) {
-      String resumeString = getOption("resume");
-      params.set("resume", resumeString);
-    }
-    else {
-      params.set("resume", null);
-    }
     
     if(hasOption("numReducers")){
     	String numReducersString = getOption("numReducers");
@@ -345,8 +356,15 @@ public final class FsmDriver extends AbstractJob {
     	params.set("numReducers", null);
     }
     
+    if(hasOption("miningAlgorithm")){
+    	String miningAlgorithmString = getOption("miningAlgorithm");
+    	params.set("miningAlgorithm", miningAlgorithmString);
+    } else {
+    	params.set("miningAlgorithm", "bfs");
+    }
     
-    Path inputDir  = null;
+    
+    Path inputDir  = getInputPath();
     Path outputDir = getOutputPath();
     
     /* ---------------------------------------------------------------------
@@ -360,36 +378,21 @@ public final class FsmDriver extends AbstractJob {
        System.out
           .println("If -(t)ype is -(m)aximal or -(c)losed then a -tempDir path must be specified");
      }*/
-     if((params.get("resume")!=null)&&(params.get("keepFiles")!=null)){
-       System.out.println("-(r)esume & -(k)eepFiles are mutually exclusive options");
+     if((params.get("mo")!=null)&&(params.get("keepEncoded")!=null)){
+       System.out.println("-(m)ine(O)nly & -(k)eepEncoded are mutually exclusive options");
        System.out.println("Exiting...");
        //Return a non-zero exit status to indicate failure
        return (1);
-     }
-     if((params.get("input")!=null)&&(params.get("resume")!=null)){
-       System.out.println("-(r)esume & -(i)nput are mutually exclusive options");
-       System.out.println("Exiting...");
-       //Return a non-zero exit status to indicate failure
-       return (1);
-     }
-     if((params.get("input")==null)&&(params.get("resume")==null)){
-       System.out.println("At least one option from -(i)nput or -(r)esume must be specified");
-       System.out.println("Exiting...");
-       //Return a non-zero exit status to indicate failure
-       return (1);
-     }
-     else{
-           if(params.get("input")!=null){
-             inputDir = new Path(params.get("input"));
-           }
-           else{
-             inputDir = new Path(params.get("resume")); 
-           }
      }
      if((params.get("timestampInput")!="false") && (params.get("temporalGap")==null)){
          System.out.println("No temporalGap (-tg) specified despite using timestampInput (-ti). Please specify a temporal gap.");
          System.out.println("Exiting...");
-         System.out.println("timestampInput is '" + params.get("timestampInput") + "'");
+         //Return a non-zero exit status to indicate failure
+         return (1);
+     }
+     if((params.get("mineOnly")=="true") && (params.get("encodeOnly")=="true")) {
+         System.out.println("You set both the flags encodeOnly and mineOnly. Please remove at least one of the flags. If you wish to do both encoding and mining, please remove both flags.");
+         System.out.println("Exiting...");
          //Return a non-zero exit status to indicate failure
          return (1);
      }
@@ -443,22 +446,37 @@ public final class FsmDriver extends AbstractJob {
     /* Execute the FSM Job depending upon the parameters specified. */ 
     String executionMethod    = getOption("execMode");
     
-    //Set the resume and keepFiles flags in the commonConfig.
+    // Set the mine/encoding only options in the commonConfig
     //Also, set the intermediateOutput path accordingly.
-    if(params.get("resume")!=null)
-      commonConfig.setResumeOption(true);
+    if(params.get("mineOnly")!=null)
+      commonConfig.setMineOnlyOption(true);
     else
-      commonConfig.setResumeOption(false);
+      commonConfig.setMineOnlyOption(false);
     
-    if(params.get("keepFiles")!=null){
-      commonConfig.setKeepFilesOption(true);
-      Path intermediateDir = new Path(params.get("keepFiles"));
+    if(params.get("encodeOnly")!=null)
+        commonConfig.setEncodeOnlyOption(true);
+      else
+        commonConfig.setEncodeOnlyOption(false);
+    
+    if(params.get("keepEncoded")!=null){
+      commonConfig.setKeepEncodedOption(true);
+      
+      Path intermediateDir;
+      // If the user specified a specific path, store the encoded output there.
+      // Otherwise, store it to a subdirectory in the output folder.
+      if(params.get("keepEncodedPath")!=null) {
+    	  intermediateDir = new Path(params.get("keepEncodedPath"));
+      }
+      else {
+    	  intermediateDir = new Path(outputDir+"/encoded/");
+      }
+     
       if(fs.exists(intermediateDir)){
     	  fs.delete(intermediateDir, true);
       }
-      commonConfig.setIntermediatePath(params.get("keepFiles"));
+      commonConfig.setIntermediatePath(intermediateDir.toString());
     }
-    else{
+    else {
       File intermediateOutputPath = File.createTempFile("MG_FSM_INTRM_OP_", "");
       
       //Below JDK 7 we are only allowed to create temporary files.
@@ -472,7 +490,7 @@ public final class FsmDriver extends AbstractJob {
                           + "to this temporary path :"
                           + intermediateOutputPath);
       
-      commonConfig.setKeepFilesOption(false);
+      commonConfig.setKeepEncodedOption(false);
     }
     
     //Set the 'tempDir' if its null
@@ -539,6 +557,17 @@ public final class FsmDriver extends AbstractJob {
     }
     
     
+    // Config debug
+    if(commonConfig.isEncodeOnlyOption())
+    	System.out.println("Encode only.");
+    if(commonConfig.isMineOnlyOption())
+    	System.out.println("Mine only.");
+    if(commonConfig.isKeepEncodedOption())
+    	System.out.println("Keep Encoded");
+    System.out.println("Intermediate Path: " + commonConfig.getIntermediatePath());
+    
+    System.exit(0);
+    
     //SEQUENTIAL EXECUTION MODE
     
     
@@ -550,7 +579,7 @@ public final class FsmDriver extends AbstractJob {
        // If we are dealing with a fresh set of transactions 
        // we need to do encode & then mine.
       
-      if(!commonConfig.isResumeOption()) {
+      if(!commonConfig.isMineOnlyOption()) {
         mySequentialMiner.createDictionary(commonConfig.getInputPath());
         mySequentialMiner.createIdToItemMap();
         
@@ -626,7 +655,7 @@ public final class FsmDriver extends AbstractJob {
       /*Execute the appropriate job based on whether we need to 
        * encode the input sequences or not.
        */
-       if(!commonConfig.isResumeOption())
+       if(!commonConfig.isMineOnlyOption())
          myDistributedMiner.runJobs();
        else
          myDistributedMiner.resumeJobs();

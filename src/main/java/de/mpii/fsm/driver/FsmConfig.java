@@ -146,8 +146,9 @@ public class FsmConfig {
   private String   outputPath;
   private String   intermediatePath;
   private String   maximumFrequencyPath;
-  private boolean  resumeOption;
-  private boolean  keepFilesOption;
+  private boolean  mineOnlyOption;
+  private boolean  encodeOnlyOption;
+  private boolean  keepEncodedOption;
   private boolean  timestampInputOption;
   private int	   temporalGap;
 
@@ -218,8 +219,9 @@ public class FsmConfig {
     this.maximumFrequencyPath = null;
 
     //other book-keeping parameters
-    this.resumeOption     = false;
-    this.keepFilesOption  = true;
+    this.mineOnlyOption     = false;
+    this.encodeOnlyOption	= false;
+    this.keepEncodedOption  = true;
     this.timestampInputOption = false;
     this.temporalGap      = 0;
     this.allowSplits      = false;
@@ -260,8 +262,9 @@ public class FsmConfig {
     this.maximumFrequencyPath = commonConfig.getMaximumFrequencyPath();
 
     //other book-keeping parameters
-    this.resumeOption     = commonConfig.isResumeOption();
-    this.keepFilesOption  = commonConfig.isKeepFilesOption();
+    this.mineOnlyOption     = commonConfig.isMineOnlyOption();
+    this.encodeOnlyOption     = commonConfig.isEncodeOnlyOption();
+    this.keepEncodedOption  = commonConfig.isKeepEncodedOption();
     this.timestampInputOption = commonConfig.isTimestampInputOption();
     this.temporalGap	  = commonConfig.getTemporalGap();
     this.allowSplits      = commonConfig.isAllowSplits();
@@ -369,32 +372,48 @@ public class FsmConfig {
    * 
    * @return boolean
    */
-  public boolean isResumeOption() {
-    return resumeOption;
-  }
-
-  /**
-   * 
-   * @param boolean resumeOption
-   */
-  public void setResumeOption(boolean resumeOption) {
-    this.resumeOption = resumeOption;
+  public boolean isMineOnlyOption() {
+    return mineOnlyOption;
   }
   
   /**
    * 
    * @return boolean
    */
-  public boolean isKeepFilesOption() {
-    return keepFilesOption;
+  public boolean isEncodeOnlyOption() {
+    return encodeOnlyOption;
   }
 
   /**
    * 
-   * @param boolean keepFilesOption
+   * @param boolean mineOnlyOption
    */
-  public void setKeepFilesOption(boolean keepFilesOption) {
-    this.keepFilesOption = keepFilesOption;
+  public void setMineOnlyOption(boolean miningOnlyOption) {
+    this.mineOnlyOption = miningOnlyOption;
+  }
+  
+  /**
+   * 
+   * @param boolean resumeOption
+   */
+  public void setEncodeOnlyOption(boolean encodeOnlyOption) {
+    this.encodeOnlyOption = encodeOnlyOption;
+  }
+  
+  /**
+   * 
+   * @return boolean
+   */
+  public boolean isKeepEncodedOption() {
+    return keepEncodedOption;
+  }
+
+  /**
+   * 
+   * @param boolean keepEncodedOption
+   */
+  public void setKeepEncodedOption(boolean keepEncodedOption) {
+    this.keepEncodedOption = keepEncodedOption;
   }
   
   /**

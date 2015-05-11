@@ -9,7 +9,7 @@ Sequential pattern mining aims to discover hidden patterns and relationships in 
 [MG-FSM][1] is a scalable, general-purpose frequent sequence mining algorithm built for MapReduce. It takes as input a collection of sequences (e.g., a text collection or Web usage logs) and mines frequent sequences subject to a number of constraints such as minimum frequency, maximum length, or proximity constraints (position-based or temporal). A detailed description of MG-FSM can be found [here][2].
 
 ###Contributors
-[Iris Miliaraki] [4], [Klaus Berberich] [5], [Rainer Gemulla] [6], [Kaustubh Beedkar] [7] and [Dhruv Gupta] [8].
+[Iris Miliaraki] [4], [Klaus Berberich] [5], [Rainer Gemulla] [6], [Kaustubh Beedkar] [7], [Dhruv Gupta] [8] and [Alexander Renz-Wieland] [9].
 
 
 MG-FSM overview
@@ -20,7 +20,7 @@ Given a collection of input sequences (a sequence database), MG-FSM finds freque
 +  Have length at most λ ≥ 2 (length threshold).
 +  Have gap at most γ ≥ 0 between consecutive items (gap threshold).
 
-In additition to these constraints, MG-FSM also supports other types of constraints. Please refer to the available command line options for details.
+In addition to these constraints, MG-FSM also supports other types of constraints. Please refer to the available command line options for details.
 
 
 Building MG-FSM
@@ -108,39 +108,40 @@ Sample output:
 
 ## Command line options
 
-| Option            | Short Hand 	| Optional 	| Default Value 	| Description                                                                                                                                                                                                  	|
-|---------------	|------------	|----------	|---------------	|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|
-| support       	| s          	| Yes      	| 1             	| The minimum number of times the sequence to be mined must be present in the Database                                                                                                                         	|
-| gamma         	| g          	| Yes      	| 2             	| The maximum amount of gap that can be taken for a sequence to be mined by MG-FSM                                                                                                                             	|
-| lambda        	| l          	| Yes      	| 5             	| The maximum length of the sequence to be mined is determined by the this parameter.                                                                                                                          	|
-| execMode      	| m          	| Yes      	| s             	| Method of execution viz. (s)equential or (d)istributed                                                                                                                                                       	|
-| type          	| t          	| Yes      	| a             	| Specify the output type.  Expected values for type: 1. (a)ll 2. (m)aximal 3. (c)losed                                                                                                                        	|
-| keepFiles     	| k          	| Yes      	| -             	| Store the intermediary files for later use or runs. Further, if -k is not specified  the intermediary output will be saved to a temporary location.  The files stored are: 1. Dictionary 2.Encoded Sequences 	|
-| resume        	| r          	| Yes      	| -             	| Resume running further runs of the MG-FSM algorithm on already  encoded transaction file located in the folder specified in input.                                                                           	|
-| input         	| i          	| Yes      	| -             	| Path where the input transactions / database text file is located.                                                                                                                                           	|
-| output        	| o          	| No       	| -             	| Path where the output files are to written.                                                                                                                                                                  	|
-| tempDir       	| tempDir    	| Yes      	| -             	| Specify the temporary directory to be used for the map– reduce jobs                                                                                                                                          	|
-| numReducers   	| N          	| Yes      	| 90            	| Specify the number of reduce task.                                                                                                                                                                           	|
-| partitionSize 	| p          	| Yes      	| 10000         	| Explicitly specify the partition size.                                                                                                                                                                       	|
-| indexing      	| id         	| Yes      	| full          	| Specify the indexing mode. Options are : 1. none 2. minmax 3. full                                                                                                                                           	|
-| split         	| sp         	| Yes      	| false         	| Explicitly specify whether or not to allow split by setting this flag.                                                                                                                                       	|
-| timestampInput   	| ti         	| Yes      	| false         	| Specify whether to use the timestamp-encoded input format                                                                                                                                     	|
-| temporalGap   	| tg         	| Yes      	| 0         		| Set a temporal gap for the timestamp-encoded input. Required when using -timestampInput.                                                                                                                                 	|
+| Option            | Short Hand 	| Optional 	| Default Value 	| Description  |
+|---------------	|------------	|----------	|---------------	|--------------------------------------------------------------------------------------	|
+| support       	| s          	| Yes      	| 1             	| The minimum number of times the sequence to be mined must be present in the Database   	|
+| gamma         	| g          	| Yes      	| 2             	| The maximum amount of gap that can be taken for a sequence to be mined by MG-FSM    |
+| lambda        	| l          	| Yes      	| 5             	| The maximum length of the sequence to be mined is determined by the this parameter.    |
+| execMode      	| m          	| Yes      	| s             	| Method of execution viz. (s)equential or (d)istributed |
+| type          	| t          	| Yes      	| a             	| Specify the output type.  Expected values for type: 1. (a)ll 2. (m)aximal 3. (c)losed  |
+| input         	| i          	| No      	| -             	| Path where the input transactions / database text file is located.                   	|
+| output        	| o          	| No       	| -             	| Path where the output files are to written.   
+| encodeOnly		| eo			| Yes		| -					| If this flag is given, only the encoding phase is executed. MG-FSM then stores the dictionary and the encoded sequences in the specified output folder.  			|
+| mineOnly			| mo			| Yes		| -					| If this flag is given, only the mining phase is executed. MG-FSM then uses the dictionary and the encoded sequences at the specified input folder and mines the sequences with the given parameters. 		|	
+| keepEncoded     	| k          	| Yes      	| -             	| Specify whether to store the intermediary files for later use or runs. If no parameter is passed, the intermediary files are stored in a sub directory of the output folder. If a path is passed as a parameter, the files will be stored at the passed path. The files stored are: 1. Dictionary 2. Encoded Sequences 	| 
+| tempDir       	| tempDir    	| Yes      	| -             	| Specify the temporary directory to be used for the map– reduce jobs   	|
+| numReducers   	| N          	| Yes      	| 90            	| Specify the number of reduce task.        	|
+| partitionSize 	| p          	| Yes      	| 10000         	| Explicitly specify the partition size.      |
+| indexing      	| id         	| Yes      	| full          	| Specify the indexing mode. Options are : 1. none 2. minmax 3. full        	|
+| split         	| sp         	| Yes      	| false         	| Explicitly specify whether or not to allow split by setting this flag.   	|
+| timestampInput   	| ti         	| Yes      	| false         	| Specify to use timestamp-encoded input format     	|
+| temporalGap   	| tg         	| Yes      	| 0         		| Set a temporal gap for the timestamp-encoded input. Required when using -timestampInput.  	|
 
 **Additional Notes**
 
-+   -(k)eepFiles and -(r)esume options are mutually exclusive.
-+   -(i)nput is optional as -(r)esume can also be used for pointing to the input source.
++   -(k)eepEncoded and -(m)ine(O)nly options are mutually exclusive.
 +   -(i)nput and -(r)esume are mutually exclusive.
-+   -(o)utput is the only mandatory option. It points to the location where the translated frequent sequences will be written.
++   -(o)utput and (i)nput are the only mandatory option.
 +   -temporalGap (-tg) is mandatory when using -timestampInput. -(g)amma values will be ignored when using -timestampInput
 
-**Timestamp-encoded input format**
+## Examples
+### Running MG-FSM on timestamp-encoded input
 
-Timestamp-encoded assumes sequences in the following format: 
->       s1 3 item1 7 item2 7 item3 8 item4 15 item4
->       s2 15 item2 16 item4 16 item2 16 item5 32 item6
->       s3 1 item7 2 item2 5 item3 8 item4
+Timestamp-encoded is in the format 
+>		sequenceID timestamp1 item1 timestamp2 item2 ... timestampN itemN
+
+The timestamps can be given in arbitrary units, e.g. days, hours, weeks. You can use the **temporalGap** parameter to specify the interval in which you want to mine frequent sequences. MG-FSM then internally calculates the according gamma value. 
 
 
 
@@ -153,3 +154,4 @@ Timestamp-encoded assumes sequences in the following format:
 [6]: http://dws.informatik.uni-mannheim.de/en/people/professors/prof-dr-rainer-gemulla/
 [7]: http://people.mpi-inf.mpg.de/~kbeedkar/
 [8]: mailto:dhgupta@mpi-inf.mpg.de
+[9]: mailto:arenzwie@mail.uni-mannheim.de
