@@ -64,7 +64,7 @@ package de.mpii.fsm.util;
 	  /*
 	   * File path for the encoded sequences file when running in the sequential mode.
 	   */
-	  public static final String ENCODED_SEQ_FILE_PATH_SEQMODE = "raw/part-r-00000";
+	  public static final String ENCODED_SEQ_FILE_PATH_SEQMODE = OUTPUT_ENCODED_SEQ_FILE_PATH + "/part-r-00000";
 	  
 	  /* 
 	   * File name for the encodedSequences is : part-r-00000

@@ -22,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -458,15 +459,19 @@ public final class FsmDriver extends AbstractJob {
       else
         commonConfig.setEncodeOnlyOption(false);
     
-    if(params.get("keepEncoded")!=null){
-      commonConfig.setKeepEncodedOption(true);
+    if(params.get("keepEncoded")!=null || params.get("encodeOnly")!=null){
+      commonConfig.setKeepEncodedOption(true); 
       
       Path intermediateDir;
       // If the user specified a specific path, store the encoded output there.
-      // Otherwise, store it to a subdirectory in the output folder.
       if(params.get("keepEncodedPath")!=null) {
     	  intermediateDir = new Path(params.get("keepEncodedPath"));
       }
+      // If it is encode only, store it at the root level
+      else if(params.get("encodeOnly")!=null) {
+    	  intermediateDir = new Path(outputDir.toString());
+      }
+      // Otherwise, store it in the /encoded/
       else {
     	  intermediateDir = new Path(outputDir+"/encoded/");
       }
@@ -524,6 +529,7 @@ public final class FsmDriver extends AbstractJob {
     							  .getIntermediatePath()
     							  .concat("/"+Constants.MAXIMUM_FREQUENCY_FILE_PATH));
     
+    
     //Supply the rest of the algorithm specific options to commonConfig
     commonConfig.setSigma(Integer.parseInt(params.get("support")));
     commonConfig.setGamma(Integer.parseInt(params.get("gamma")));
@@ -566,7 +572,6 @@ public final class FsmDriver extends AbstractJob {
     	System.out.println("Keep Encoded");
     System.out.println("Intermediate Path: " + commonConfig.getIntermediatePath());
     
-    System.exit(0);
     
     //SEQUENTIAL EXECUTION MODE
     
@@ -576,76 +581,103 @@ public final class FsmDriver extends AbstractJob {
       
       mySequentialMiner = new SequentialMode(commonConfig);
       
-       // If we are dealing with a fresh set of transactions 
-       // we need to do encode & then mine.
-      
+      // Step 1: Construct the dictionary and encode sequences
       if(!commonConfig.isMineOnlyOption()) {
+    	System.out.println("#### ENCODE");
         mySequentialMiner.createDictionary(commonConfig.getInputPath());
-        mySequentialMiner.createIdToItemMap();
+        mySequentialMiner.createIdToItemMap(); 
         
-        // If TimestampInput, calculate gamma from temporal gap and maximum frequency
-        if(commonConfig.isTimestampInputOption()) {
-        	int tg = commonConfig.getTemporalGap();
-        	int mf = mySequentialMiner.getDictionary().getMaximumFrequency();
-        	
-        	int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
-        	
-        	System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
-        	
-        	// Pass the calculated gamma to the Sequential Mode config and to the miner object
-        	mySequentialMiner.commonConfig.setGamma( gamma );
-        	mySequentialMiner.myBfsMiner.setParametersAndClear(commonConfig.getSigma(), gamma, commonConfig.getLambda());
-        }
-        
-        //If the input path is a corpus 
-        //runSeqJob will recursively call encodeAndMine()
-        //on all the files to bring together a encoded sequences file
-        //and consequently call the sequences miner on each of these
-        //encoded sequences
-        mySequentialMiner.runSeqJob(new File(commonConfig.getInputPath()));
+        mySequentialMiner.encodeFiles();
       }
-      /* 
-       * If the transactions are encoded from previous runs, then run
-       * the following set of functions for reading the encoded transactions
-       * and then directly mine them for frequent sequences.  
-       */
-      else { 	 
-        mySequentialMiner.setIdToItemMap(new Dictionary()
-                                        .readDictionary(commonConfig
+      
+      // MINING
+      // If the user specified to mine the dataset, run the mining
+      if(!commonConfig.isEncodeOnlyOption()) {
+    	  System.out.println("#### MINE");
+    	  
+    	// Read encoded files (if we are using pre-encoded files)
+    	if(commonConfig.isMineOnlyOption()) {
+    		// Test dictionary reading
+    		/*
+    		System.out.println("====> Testing dic read: classic");
+    		Map<Integer, String> dict = new Dictionary().readDictionary(commonConfig.getInputPath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH));
+    		for(Map.Entry<Integer, String> entry : dict.entrySet()) {
+    			System.out.println(entry.getKey() + "\t" + entry.getValue());
+    		}
+    		
+    		System.out.println("====> Testing dic read: json");
+    		dict = new Dictionary().readJSONDictionary(commonConfig.getInputPath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH+".json"));
+    		for(Map.Entry<Integer, String> entry : dict.entrySet()) {
+    			System.out.println(entry.getKey() + "\t" + entry.getValue());
+    		}
+    		
+    		System.out.println("==>Testing finished.");
+    		System.exit(0);
+    		*/
+    		
+    		mySequentialMiner.setIdToItemMap(new Dictionary()
+                                        .readJSONDictionary(commonConfig
                                                        .getInputPath()
-                                                       .concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH)));
+                                                       .concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH+".json")));
+    	}
+    	
+    	// If using timestampInput, calculate gamma from temporal gap and the maximum frequency
+    	if(commonConfig.isTimestampInputOption()) {
+    		int tg = commonConfig.getTemporalGap();
+    		/*int mf = 0;
+    		
+    		// If we are using pre-encoded files, read the maximum frequency from the maxFreq file
+    		 if(commonConfig.isMineOnlyOption()){
+        		String mfPath = commonConfig.getInputPath().concat("/"+Constants.MAXIMUM_FREQUENCY_FILE_PATH);
+    			BufferedReader reader = new BufferedReader(new FileReader(mfPath));
+    			try {
+    			  String line = reader.readLine();
+    			  mf = Integer.parseInt(line.split("\t")[1]);
+    			}
+    			catch (IOException e) {
+    			  System.err.println("Maximum frequency file not found at " + mfPath);
+    			  e.printStackTrace();
+    			}
+    			finally {
+    			  reader.close();
+    			}
+    		}
+    		
+    		// If we just encoded the input, use the calculated maxFreq
+    		else {
+    			mf = mySequentialMiner.getDictionary().getMaximumFrequency();
+    		} */
+    		
+    		// Maximum frequency is already stored in dictionary object 
+    		// (when mining only, maxFreq value is read when JSON dict is loaded)
+    		int mf = mySequentialMiner.getDictionary().getMaximumFrequency();
+    		
+    		// Calculate gamma and pass it the config and to the miner
+    		int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
+			mySequentialMiner.commonConfig.setGamma( gamma );
+			mySequentialMiner.myBfsMiner.setParametersAndClear(commonConfig.getSigma(), gamma, commonConfig.getLambda());
+			System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
+    		
+    	}
+    	
+    	// Mine encoded files
+    	mySequentialMiner.mineFiles();
+    	
+    	/* DEPRECATED
+    	// Mine previously encoded input
+    	if(commonConfig.isMineOnlyOption()){
+    		mySequentialMiner.encodeAndMine(mySequentialMiner.getCommonConfig().getInputPath());
+    	}
+    	// Mine just-now encoded input
+    	else {
+    		mySequentialMiner.runSeqJob(new File(commonConfig.getInputPath()));
+    	}
+    	*/
+		
         
-        // If using TimestampInput, read maximum frequency from written file
-        // 	 and calculate gamma from the tempral gap and the max freq
-        if(commonConfig.isTimestampInputOption()) {
-        	int tg = commonConfig.getTemporalGap();
-        	int mf = 0;
-        	
-        	String mfPath = commonConfig.getInputPath().concat("/"+Constants.MAXIMUM_FREQUENCY_FILE_PATH);
-        	BufferedReader reader = new BufferedReader(new FileReader(mfPath));
-        	try {
-			  String line = reader.readLine();
-			  mf = Integer.parseInt(line.split("\t")[1]);
-        	}
-        	catch (IOException e) {
-			  System.err.println("Maximum frequency file not found at " + mfPath);
-			  e.printStackTrace();
-        	}
-        	finally {
-			  reader.close();
-        	}
-        	int gamma = (tg-1) * (2*mf-1) + (3*mf-3);
-        	
-        	System.out.println("Gamma calculated from temporalGap(="+tg+") and maximumFrequency(="+mf+"): "+gamma);
-        	
-        	// Pass the calculated gamma to the Sequential Mode config and to the miner object
-        	mySequentialMiner.commonConfig.setGamma( gamma );
-        	mySequentialMiner.myBfsMiner.setParametersAndClear(commonConfig.getSigma(), gamma, commonConfig.getLambda());
-        }
         
-        mySequentialMiner.encodeAndMine(mySequentialMiner.getCommonConfig().getInputPath());
       }
-    } 	
+    } 	 
     
     
     //DISTRIBUTED EXECUTION MODE
@@ -655,10 +687,13 @@ public final class FsmDriver extends AbstractJob {
       /*Execute the appropriate job based on whether we need to 
        * encode the input sequences or not.
        */
-       if(!commonConfig.isMineOnlyOption())
-         myDistributedMiner.runJobs();
+      
+       // Mine
+       if(commonConfig.isMineOnlyOption())
+           myDistributedMiner.resumeJobs();
+       // Encode + Mine
        else
-         myDistributedMiner.resumeJobs();
+           myDistributedMiner.runJobs();
        
     }
     //END OF EXECUTING FSM JOB

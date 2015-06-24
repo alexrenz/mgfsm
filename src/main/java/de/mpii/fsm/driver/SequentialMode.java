@@ -105,6 +105,8 @@ public class SequentialMode {
    * in the outputFolderName attribute;
    */
   private FsmWriterSequential seqWriter;
+  
+  private int numInputFiles = 0;
 
  //END OF ATTRIBUTES
 
@@ -260,29 +262,13 @@ public class SequentialMode {
      */
     this.seqWriter.setIdToItemMap(this.idToItemMap);
   }
-
-  /**
-   * Non-recursive function to initiate the enconding and mining
-   * 
-   * @param dir A file object defining the top directory
-   * @throws IOException 
-   * @throws InterruptedException 
+  
+  /** 
+   * Reads sequences from the input path, encodes them and stores the encoded sequences in the intermediate dir
    **/
-  public void runSeqJob(File dir) throws IOException, InterruptedException
-  {
-    // Prepare the miner
-	/*  Clear the bfs object for use     */
-    myBfsMiner.clear();
-                                                                  
-    String dicFilePath = this.commonConfig.getIntermediatePath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH);
-    int sigma = this.commonConfig.getSigma();
-    
-    myBfsMiner.setFlistMap(this.dictionary.getFListMap(dicFilePath, sigma));
-	  
-	readPathRecursively(dir);
-    
-    // mine sequence and SequenceWriter will display (sequence, support)
-    myBfsMiner.mineAndClear(this.seqWriter);
+  public void encodeFiles() throws IOException, InterruptedException {
+	  File dir = new File(commonConfig.getInputPath());
+	  scanPathRecursively(dir);
   }
   
   /**
@@ -292,36 +278,36 @@ public class SequentialMode {
    * @param dir A file object defining the top directory
    * @throws IOException 
    **/
-  public void readPathRecursively(File dir) throws IOException {
+  public void scanPathRecursively(File dir) throws IOException {
 	  String pattern = ".txt";
 	    
 	    if(dir.isFile() && dir.getName().endsWith(pattern)){
-	      encodeAndMine(dir);
+	    	encodeFile(dir);
 	    }
 	    else{
 	      File listFile[] = dir.listFiles();
 	      if (listFile != null) {
 	        for (int i=0; i<listFile.length; i++) {
 	          if (listFile[i].isDirectory()) {
-	        	  readPathRecursively(listFile[i]);
+	        	  scanPathRecursively(listFile[i]);
 	          } else {
 	            if (listFile[i].getName().endsWith(pattern)) {
-	              encodeAndMine(listFile[i]);
+	              encodeFile(listFile[i]);
 	            }
 	          }
 	        }
 	      }
 	    }
   }
-
+  
   /**
-   * This method encode transactions , mines the pattern,
-   * files the encoded transaction into a local disk copy.
-   *  
-   * @param file The input file which contains the textual sequences.
- * @throws IOException 
+   * encodeFile takes one single input file, encodes it and 
+   * writes the encoded sequences to disk
+   * 
+   * @param file: A file to encode
+   * @return void 
    */
-  public void encodeAndMine(File file) throws IOException {
+  public void encodeFile(File file) throws IOException {
 
     try {
       Configuration conf = new Configuration();
@@ -343,6 +329,329 @@ public class SequentialMode {
        * disk.
        *------------------------------------------------------------------
        */
+      String outputFileName = this.commonConfig.getIntermediatePath();
+      outputFileName        = outputFileName.concat("/"+Constants.OUTPUT_ENCODED_SEQ_FILE_PATH + 
+    		  					"/" + Constants.ENCODED_LIST_FILE_NAME.substring(0, Constants.ENCODED_LIST_FILE_NAME.lastIndexOf("-")+1) +
+    		  					String.format("%05d", numInputFiles++));
+      File outFile          = new File(outputFileName);
+      
+      System.out.println("Creating file: " + outputFileName);
+      
+      boolean useTimestampInput = this.commonConfig.isTimestampInputOption();
+      
+      // variables for timestamp-encoded format
+      long currTime = 0;
+	  long prevTime = 0;
+	  long timeDelta = 0;
+	  long timeGap = 0;
+	  int repeats = 0;
+	  int multiplyFactor = 0;
+	  
+	  // For timestamp-encoded input
+	  if(this.commonConfig.isTimestampInputOption()) {
+		  int maximumFrequency = this.dictionary.getMaximumFrequency();
+		  	
+		  multiplyFactor = (2 * maximumFrequency) - 1;
+		  System.out.println("MultiplyFactor = " + multiplyFactor);
+	  }
+      
+      //If parent folder "raw" doesn't exist create it now
+      if(!fs.exists(new Path(outputFileName)))
+        fs.create(new Path(outputFileName));
+      
+      BufferedWriter outputBr = new BufferedWriter(new FileWriter(outFile, true));
+
+      //End of initialization
+
+      while ((strLine = br.readLine()) != null) 
+      {
+        String[] splits = strLine.split("\\s+");
+
+        // write the sequence identifier to the file on local disk
+        outputBr.write(splits[0] + "\t");
+        
+        // initialize array to form new transaction
+        int[] transaction;
+        int index = 0;
+        
+        // standard input format
+        if(!useTimestampInput){
+        	
+        	// for standard input, length is exactly splits.length - 1
+        	transaction = new int[splits.length - 1];
+             
+	        for(int i = 1; i < splits.length; ++i) {
+	
+	        	String item = splits[i];
+	
+	          // look up the id in the dictionary to form
+	          // the encoded transaction.
+	          if (this.dictionary.getDictionary().containsKey(item)) {
+	            transaction[index] = this.dictionary.getDictionary().get(item).getId();
+	            index++;
+	          }
+	          //index++;
+	        }
+         }
+         // timestamp-encoded sequence format
+         else {
+        	// for timestamps, max length is splits.length - 2
+        	// note: this is more than standard format, as splits.length is double due to the timestamps
+        	transaction = new int[splits.length - 2];
+        	 
+        	for (int i = 1; i < splits.length; i=i+2) {
+  		      // multiply each time-stamp by m=2f-1, where f is the maximum allowed frequency
+  		      // f identical repeated time-stamps [t,t,...,t] will be replaced by [m*t, m*(t+1), m*(t+2), ... m*(t+f-1)]
+  		      currTime = Long.parseLong(splits[i]) * multiplyFactor;
+
+  		      if (i != 1) {
+  		        //item = Long.parseLong(tokens[i + 1]);
+  		        timeDelta = currTime - prevTime;
+  		        if (timeDelta < 0) {
+  		          System.err.println("Wrongly formatted input! TimeDelta is " + timeDelta + " (" + currTime + " - " + prevTime + ")");
+  		          System.exit(1);
+  		        }
+  		        if (timeDelta == 0) {
+  		          // replace consecutive identical time-stamps
+  		          repeats++;
+  		          if (this.dictionary.getDictionary().containsKey(splits[i+1])) {
+  		        	transaction[index] = this.dictionary.getDictionary().get(splits[i+1]).getId();
+  		        	index++;
+  		          }
+  		        } else {
+  		          // new increasing time-stamp, reset repeat counter
+  		          timeGap = timeDelta - repeats - 1;
+  		          repeats = 0;
+  		          if (timeGap > 0) {
+  		        	  transaction[index] = (int) -timeGap;
+  		        	  index++;
+  	  		          if (this.dictionary.getDictionary().containsKey(splits[i+1])) {
+  	  		        	transaction[index] = this.dictionary.getDictionary().get(splits[i+1]).getId();
+  	  		        	index++;
+  	  		          }
+  		          } else {
+  		        	if (this.dictionary.getDictionary().containsKey(splits[i+1])) {
+  	  		        	transaction[index] = this.dictionary.getDictionary().get(splits[i+1]).getId();
+  	  		        	index++;
+  	  		          }
+  		          }
+  		        }
+  		        prevTime = currTime;
+  		      } else {
+  		        // first item, no time delta appended
+  		        prevTime = currTime;
+	  		    if (this.dictionary.getDictionary().containsKey(splits[i+1])) {
+  		        	transaction[index] = this.dictionary.getDictionary().get(splits[i+1]).getId();
+  		        	index++;
+	  		    }
+  		      }
+
+  		    }
+        }
+    	
+    	// In timestamp-encoded format, there might be trailing 0s in 'transaction' 
+        // => Remove trailing 0s
+        if(useTimestampInput) {
+            // count 0s at the end
+            int nzeros = 0;
+            for(int i=transaction.length-1; transaction[i]==0; i--) {
+            	nzeros++;
+            }
+            // remove the trailing 0s
+            int[] transaction_withzeros = transaction;
+            transaction = new int[transaction_withzeros.length-nzeros];
+            System.arraycopy(transaction_withzeros, 0, transaction, 0, transaction_withzeros.length-nzeros);
+        }
+        
+        //write to the transaction to the local disk
+        outputBr.write(Arrays.toString(transaction) + "\n");
+
+      }
+      br.close();
+      outputBr.close();
+
+    } 
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+    
+  }
+  
+  
+  /**
+   * mineFiles prepares the miner object before it scans the input/intermediate
+   * directory for files of encoded sequences and appends these to the miner
+   * 
+   * @return void 
+   */
+  public void mineFiles() throws IOException, InterruptedException {
+	/* Prepare the miner */
+	myBfsMiner.clear();
+	// Read the dictionary
+	String dicFilePath = this.commonConfig.getIntermediatePath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH);
+	if(commonConfig.isMineOnlyOption()) {
+		dicFilePath = commonConfig.getInputPath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH);
+	}
+	int sigma = this.commonConfig.getSigma();    
+	myBfsMiner.setFlistMap(this.dictionary.getFListMap(dicFilePath, sigma));
+		  
+	// Determine the path of the encoded files
+    String inputDir;
+  	if(commonConfig.isMineOnlyOption()) {
+  		inputDir = commonConfig.getInputPath();
+  	}
+  	else {
+  		inputDir = commonConfig.getIntermediatePath();
+  	}
+  	inputDir = inputDir.concat("/"+Constants.OUTPUT_ENCODED_SEQ_FILE_PATH);
+  	
+  	// Mine all non-hidden files in that directory
+  	File listFile[] = new File(inputDir).listFiles();
+    if (listFile != null) {
+      for (int i=0; i<listFile.length; i++) {
+    	  if(!listFile[i].isHidden()) {
+    		  mineFile(listFile[i]);
+    	  }
+      }
+    }
+    
+    // mine sequence and SequenceWriter will display (sequence, support)
+    myBfsMiner.mineAndClear(this.seqWriter);
+  }
+  
+  /**
+   * mineFile takes one single encoded file, parses the sequences and 
+   * adds each sequence to the miner
+   * 
+   * @param file: A file of encoded sequences
+   * @return void 
+   */
+  public void mineFile(File file) {       
+	System.out.println("Mining file: " + file.toString());
+
+  	// Add each sequence to the miner
+    try {
+      Configuration conf = new Configuration();
+      FileSystem fs = FileSystem.get(conf);
+      /* Read the input sequences file during these steps.
+       * The input sequences are read one by one and 
+       * encoded using the dictionary constructed and stored
+       * internally.
+       */
+      FileInputStream fstream = new FileInputStream(file);
+
+      /*  Get the object of DataInputStream          */
+      DataInputStream in = new DataInputStream(fstream);
+      BufferedReader br  = new BufferedReader(new InputStreamReader(in));
+      String strLine;
+
+      while ((strLine = br.readLine()) != null) 
+      { // Line format: s4	[8, 11, 10, 14, 20, 21, 9]
+    	
+    	// Read line
+    	String[] splits = strLine.substring(strLine.indexOf("[")+1).replace("]", "").split(",\\s");
+        int[] transaction = new int[splits.length];
+        
+        for(int i=0; i<splits.length; i++) {
+        	transaction[i] = Integer.parseInt(splits[i]);
+        }
+        
+        System.out.println("-- Add transaction: " + Arrays.toString(transaction));
+        // Add transaction to the miner
+        myBfsMiner.addTransaction(transaction, 0, transaction.length, 1);
+      }
+      br.close();
+
+    } 
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+    
+  }
+  
+
+  /**
+   * Non-recursive function to initiate the enconding and mining
+   * 
+   * @param dir A file object defining the top directory
+   * @throws IOException 
+   * @throws InterruptedException 
+   **/
+  /*public void DEPRECATEDrunSeqJob(File dir) throws IOException, InterruptedException
+  {
+    // Prepare the miner
+	/*  Clear the bfs object for use     * /
+    myBfsMiner.clear();
+                                                                  
+    String dicFilePath = this.commonConfig.getIntermediatePath().concat("/"+Constants.OUTPUT_DICTIONARY_FILE_PATH);
+    int sigma = this.commonConfig.getSigma();
+    
+    myBfsMiner.setFlistMap(this.dictionary.getFListMap(dicFilePath, sigma));
+	  
+	readPathRecursively(dir);
+    
+    // mine sequence and SequenceWriter will display (sequence, support)
+    myBfsMiner.mineAndClear(this.seqWriter);
+  }*/
+  
+  /**
+   * Recursive function to descend into the directory tree and find all the files 
+   * that end with ".txt"
+   * 
+   * @param dir A file object defining the top directory
+   * @throws IOException 
+   **/
+  /* public void DEPRECATEDreadPathRecursively(File dir) throws IOException {
+	  String pattern = ".txt";
+	    
+	    if(dir.isFile() && dir.getName().endsWith(pattern)){
+	      encodeAndMine(dir);
+	    }
+	    else{
+	      File listFile[] = dir.listFiles();
+	      if (listFile != null) {
+	        for (int i=0; i<listFile.length; i++) {
+	          if (listFile[i].isDirectory()) {
+	        	  readPathRecursively(listFile[i]);
+	          } else {
+	            if (listFile[i].getName().endsWith(pattern)) {
+	              encodeAndMine(listFile[i]);
+	            }
+	          }
+	        }
+	      }
+	    }
+  } */
+
+  /**
+   * This method encode transactions , mines the pattern,
+   * files the encoded transaction into a local disk copy.
+   *  
+   * @param file The input file which contains the textual sequences.
+ * @throws IOException 
+   */
+  /* public void DEPRECATEDencodeAndMine(File file) throws IOException {
+
+    try {
+      Configuration conf = new Configuration();
+      FileSystem fs = FileSystem.get(conf);
+      /* Read the input sequences file during these steps.
+       * The input sequences are read one by one and 
+       * encoded using the dictionary constructed and stored
+       * internally.
+       * /
+      FileInputStream fstream = new FileInputStream(file);
+
+      /*  Get the object of DataInputStream          * /
+      DataInputStream in = new DataInputStream(fstream);
+      BufferedReader br  = new BufferedReader(new InputStreamReader(in));
+      String strLine;
+
+      /*------------------------------------------------------------------
+       * Initialization for writing the encoded sequences to text file on
+       * disk.
+       *------------------------------------------------------------------
+       * /
       String outputFileName = this.commonConfig.getIntermediatePath();
       outputFileName        = outputFileName.concat("/"+Constants.OUTPUT_ENCODED_SEQ_FILE_PATH + 
     		  										"/" + Constants.ENCODED_LIST_FILE_NAME);
@@ -529,7 +838,7 @@ public class SequentialMode {
       e.printStackTrace();
     }
     
-  }
+  }*/
 
   /**
    * The following function is a overloaded version of the <i> encodeAndMine() <\i>.
@@ -540,7 +849,7 @@ public class SequentialMode {
    * @return void
    * @param String outputFolder
    */
-  public void encodeAndMine(String outputFolder) throws IOException, InterruptedException {
+  /*public void DEPRECATEDencodeAndMine(String outputFolder) throws IOException, InterruptedException {
 
 	// clear the bfs object for use
 	myBfsMiner.clear();
@@ -556,7 +865,7 @@ public class SequentialMode {
     try {     
       /* Read the encoded file during the below steps, and 
        * pass them one-by-one to the BfsMiner object.
-       */
+       * /
       FileInputStream fstream = new FileInputStream(encodedFileName);
 
       // Get the object of DataInputStream
@@ -572,7 +881,7 @@ public class SequentialMode {
          * 3. "<whitespace>"
          * 4. ","
          * to tokenize it.
-         */
+         * /
         strLine = strLine.replaceAll("[\\s+,]", " ")
             .replaceAll("\\[", " ")
             .replaceAll("\\]", " ");
@@ -598,7 +907,7 @@ public class SequentialMode {
 
     } catch (Exception e) {
 
-      /* Can only occur if file is of inappropriate type*/
+      /* Can only occur if file is of inappropriate type* /
       System.out.println("\n------------\n"+
           " E R R O R " +
           "\n------------\n");
@@ -606,6 +915,6 @@ public class SequentialMode {
       System.exit(1);
     }
 
-  }
+  }*/
   //END OF METHODS
 }//END OF CLASS

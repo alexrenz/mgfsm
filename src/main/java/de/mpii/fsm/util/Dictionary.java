@@ -11,10 +11,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.StringWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +29,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.mahout.math.map.OpenIntIntHashMap;
 import org.apache.mahout.math.map.OpenObjectIntHashMap;
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonEncoding;
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.JsonToken;
+import org.eclipse.jdt.core.dom.ThisExpression;
 
 /**
  * 
@@ -401,6 +410,208 @@ public class Dictionary {
   
   
   }
+  
+  
+  public void loadJSON(Configuration conf, String fileName, int[] colsToLoad, 
+    int minDocFreq, int minColFreq) throws IOException {
+	  
+	System.out.println("Starting json read;");
+
+    // understanding what to load
+    boolean loadItem = false;
+    boolean loadDocFreq = false;
+    boolean loadColFreq = false;
+    boolean loadItemId = false;
+    for(int col : colsToLoad) {
+      if(col == Constants.ITEM)
+        loadItem = true;
+      if(col == Constants.DOC_FREQ)
+        loadDocFreq = true;
+      if(col == Constants.COL_FREQ)
+        loadColFreq = true;
+      if(col == Constants.ITEM_ID)
+        loadItemId = true;
+    }
+
+    // creating some temporary lists needed during the loading
+    // of the dictionary
+    List<Integer> itemIdsList = new ArrayList<Integer>();
+    List<Integer> docFreqsList = new ArrayList<Integer>();
+    List<Integer> colFreqsList = new ArrayList<Integer>();
+    List<String> itemList = new ArrayList<String>();
+
+    // loading the data to the lists
+    /* 
+     * Depending upon whether the 
+     * configuration is passed as a argument or 
+     * not pass the appropriate stream to 
+     * buffered reader.
+     */
+    JsonFactory jsonfactory = new JsonFactory();
+    File source = new File(fileName);
+    
+    JsonParser parser = null;
+    if(conf == null){
+      @SuppressWarnings("resource")
+      FileInputStream fstream = new FileInputStream(fileName);
+      parser = jsonfactory.createJsonParser(fstream);
+    }
+    else { 
+      FileSystem fs          = FileSystem.get(conf);
+      FSDataInputStream  dis = fs.open(new Path(fileName));
+      parser = jsonfactory.createJsonParser(dis);
+    }
+
+
+    String line = null;
+    int colFreqValue = -1;
+    int docFreqValue = -1;
+    
+    int idValue = -1;
+    String termValue = null;
+    
+    while (parser.nextToken() != JsonToken.END_OBJECT) {
+      String token = parser.getCurrentName();
+      
+      if("maxRepetitionsPerTimestamp".equals(token)) {
+    	  parser.nextToken();
+    	  this.maximumFrequency = parser.getValueAsInt();
+    	  System.out.println("Max Frequency: "+this.maximumFrequency);
+      }
+      
+      if("dictionary".equals(token)) {
+    	  
+    	  // Parse tokens until we hit the end of the array - ']'
+    	  while(parser.nextToken() != JsonToken.END_ARRAY){
+    		  /* Structure of the JSON object of one item:
+    		   * {
+    		   * 	id: 1,
+    		   * 	term: "term",
+    		   * 	colFreq: 3,
+    		   * 	docFreq: 2
+    		   * }
+    		   */
+    		  
+    		  // Handle one item in one run
+    		  if(parser.getCurrentToken() == JsonToken.START_OBJECT) {
+    			  
+    			  // Step 1: extract the information of this term from the json
+    			  while(parser.nextToken() != JsonToken.END_OBJECT) {
+		    		  String element_token = parser.getCurrentName();
+		    		  
+		    		  if("id".equals(element_token)) {
+		    	    	  parser.nextToken();
+		    	    	  idValue = parser.getValueAsInt();
+		    	      }
+		    		  if("term".equals(element_token)) {
+		    	    	  parser.nextToken();
+		    	    	  termValue = parser.getText();
+		    	      }
+		    		  if("colFreq".equals(element_token)) {
+		    	    	  parser.nextToken();
+		    	    	  colFreqValue = parser.getValueAsInt();
+		    	      }
+		    		  if("docFreq".equals(element_token)) {
+		    	    	  parser.nextToken();
+		    	    	  docFreqValue = parser.getValueAsInt();
+		    	      }
+    			  }
+    			  
+    			  System.out.println("- Item: " + idValue + ", " + termValue + ", " + colFreqValue + ", " + docFreqValue);
+        		  
+    			  
+    			  
+    			  // Step 2: Add this term to the lists
+    			  
+    			  // we check if the line satisfies the minimum given frequencies 
+    			  if(minColFreq > -1) {
+    				  if(colFreqValue < minColFreq)
+    					  continue;
+        		  }
+    			  if(minDocFreq > -1) {
+    				  if(docFreqValue < minDocFreq)
+    					  continue;
+    			  }
+    			  
+    			  // keep the columns we are interested in
+    			  if(loadColFreq) {
+    		        colFreqsList.add(colFreqValue);
+    		        colFreqValue = -1;
+    		      }
+    		      if(loadDocFreq) {
+    		    	docFreqsList.add(docFreqValue);
+    		        docFreqValue = -1;
+    		      }
+    		      if(loadItem)
+    		        itemList.add(termValue);
+    		      if(loadItemId)
+    		        itemIdsList.add(idValue);
+    		  }
+    		  
+    		  
+		  }
+      }
+        
+    }
+    
+    parser.close();
+    
+      
+    
+    // filling the arrays with data
+    if(!itemIdsList.isEmpty()) {
+      itemIds = new int[itemIdsList.size()];
+      int pos = 0;
+      for(Integer tempInt : itemIdsList) {
+        itemIds[pos] = tempInt;
+        pos++;
+      }
+      itemIdsList = null;
+    }
+    if(!docFreqsList.isEmpty()) {
+      docFreqs = new int[docFreqsList.size()];
+      int pos = 0;
+      for(Integer tempInt : docFreqsList) {
+        docFreqs[pos] = tempInt;
+        pos++;
+      }
+      docFreqsList = null;
+    }
+    if(!colFreqsList.isEmpty()) {
+      colFreqs = new int[colFreqsList.size()];
+      int pos = 0;
+      for(Integer tempInt : colFreqsList) {
+        colFreqs[pos] = tempInt;
+        pos++;
+      }
+      colFreqsList = null;
+    }
+    if(!itemList.isEmpty()) {
+      items = new String[itemList.size()];
+      int pos = 0;
+      for(String tempStr : itemList) {
+        items[pos] = tempStr;
+        pos++;
+      }
+      itemList = null;
+
+    }
+
+    // if the termIDs are present we create a map from
+    // the termId to the array positions of these termIds
+    if(itemIds != null) {
+      itemIdToPos = new HashMap<Integer, Integer>();
+      int pos = 0;
+      for(int termId : itemIds) {
+        itemIdToPos.put(termId, pos);
+        pos++;
+      }
+    }
+  
+  
+  
+  }
+  
 
   public int itemID(int pos) {
     if(itemIds != null)
@@ -662,6 +873,54 @@ public class Dictionary {
 	    }
     	
     }
+    
+    writeJSONDictionary(outputFolderName);
+  }
+  
+  public void writeJSONDictionary(String outputFolderName) {
+	  try {
+		  // Example from here: http://javarevisited.blogspot.de/2015/03/parsing-large-json-files-using-jackson.html
+		  
+		  JsonFactory jsonfactory = new JsonFactory();
+		  String fileName = outputFolderName.concat("/" + Constants.OUTPUT_DICTIONARY_FILE_PATH + ".json");
+		  File jsonDoc = new File(fileName);
+		  
+		  JsonGenerator gen = jsonfactory.createJsonGenerator(jsonDoc, JsonEncoding.UTF8);
+		  
+		  gen.writeStartObject();
+		  gen.writeStringField("inputFile",corpusFolderPath);
+		  gen.writeStringField("date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+		  if(this.useTimestampInput) {
+			  gen.writeBooleanField("timestampInput", true);
+			  gen.writeNumberField("maxRepetitionsPerTimestamp", this.maximumFrequency);
+		  }
+		  else {
+			  gen.writeBooleanField("timestampInput", false);
+		  }
+		  
+		  gen.writeFieldName("dictionary");
+		  gen.writeStartArray();
+		  
+		  for(DicItem item: this.dictionaryFinal) {
+			  gen.writeStartObject();
+			  gen.writeNumberField("id", item.getId());
+			  gen.writeStringField("term", item.getTerm());
+			  gen.writeNumberField("colFreq", item.getCollectionFreq());
+			  gen.writeNumberField("docFreq", item.getDocumentFreq());
+			  gen.writeEndObject();
+		  }
+		  
+		  gen.writeEndArray();
+		  gen.writeEndObject();
+		  
+		  gen.close();
+		  
+		  System.out.println("JSON file written to " + fileName);
+	  } catch (Exception e) {
+		  e.printStackTrace();
+	  }
+	  
+	  
   }
 
   /**
@@ -682,6 +941,30 @@ public class Dictionary {
       colsToLoad[0] = Constants.ITEM;
       colsToLoad[3] = Constants.ITEM_ID;
       this.load( null,dictionaryFilePath, colsToLoad, 0, -1);
+
+      int[] itemIdList = this.itemIds;
+
+      for (int itemId : itemIdList) {
+        String itemName = this.items[this.posOf(itemId)];
+        itemIdToName.put(itemId, itemName);
+      }
+    } catch (Exception e) {
+
+      e.printStackTrace();
+    }
+    return itemIdToName;
+  }
+  
+  public Map<Integer, String> readJSONDictionary(String dictionaryFilePath) 
+  {
+    int[] colsToLoad = new int[4];
+    // Map each item id to its name
+    Map<Integer, String> itemIdToName = new HashMap<Integer, String>();
+    try {
+
+      colsToLoad[0] = Constants.ITEM;
+      colsToLoad[3] = Constants.ITEM_ID;
+      this.loadJSON( null,dictionaryFilePath, colsToLoad, 0, -1);
 
       int[] itemIdList = this.itemIds;
 

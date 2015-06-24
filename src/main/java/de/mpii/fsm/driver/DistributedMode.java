@@ -148,22 +148,24 @@ public class DistributedMode
           ToolRunner.run(new ConvertTimestampSequences(), toolRunnerArgs);
       }
       
-     
-      /* Step 2. Mine the frequent sequences. */
-      FsmJob.runFsmJob();
-      
-      // If -t options is provided with m(aximal) or c(losed)
-      if(commonConfig.getType() != Type.ALL) {
-        MaxFsmJob.setCommonConfig(FsmJob.getCommonConfig());
-        MaxFsmJob.runMaxFsmJob();
+      // Run the mining only if the user wants to run it
+      if(!commonConfig.isEncodeOnlyOption()) {
+	      /* Step 2. Mine the frequent sequences. */
+	      FsmJob.runFsmJob();
+	      
+	      // If -t options is provided with m(aximal) or c(losed)
+	      if(commonConfig.getType() != Type.ALL) {
+	        MaxFsmJob.setCommonConfig(FsmJob.getCommonConfig());
+	        MaxFsmJob.runMaxFsmJob();
+	      }
+	      
+	      
+	      /*
+	       * Step 3. Perform translation from encoded 
+	       * sequences to text.
+	       */
+	      SequenceTranslator.main(seqTranslatorArgs);
       }
-      
-      
-      /*
-       * Step 3. Perform translation from encoded 
-       * sequences to text.
-       */
-      SequenceTranslator.main(seqTranslatorArgs);
 
     } catch (Exception e) {
       e.printStackTrace();
